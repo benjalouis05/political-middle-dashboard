@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The political middle: humans vs language models</title>
+<style>
+:root {
+  --bg: #fcfcfb; --card: #f4f3f0; --text: #1a1a19; --text2: #52514e;
+  --muted: #898781; --border: #e1e0d9; --border2: #c3c2b7;
+  --blue: #2a78d6; --red: #e34948; --violet: #4a3aa7; --amber: #eda100;
+  --gray: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a19; --card: #262625; --text: #f2f1ec; --text2: #c3c2b7;
+          --muted: #898781; --border: #2c2c2a; --border2: #383835;
+          --violet: #9085e9; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main { max-width: 920px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
+h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+section { margin-top: 3rem; }
+p.sub { color: var(--text2); font-size: 14px; margin: 0 0 14px; }
+p.note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+button { font: inherit; font-size: 13px; color: var(--text);
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+button:hover { background: var(--card); }
+button.on { border-color: var(--text); }
+select { font: inherit; font-size: 13px; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 5px 8px; max-width: 280px; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin: 0 0 12px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px;
+  color: var(--text2); margin: 4px 0 0; }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin: 0 0 14px; }
+.card { background: var(--card); border-radius: 10px; padding: 0.9rem 1rem; }
+.card .k { font-size: 12px; color: var(--muted); }
+.card .v { font-size: 24px; font-weight: 500; }
+.grid14 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 16px; margin-top: 14px; }
+.grid14 .cell { font-size: 12px; color: var(--text2); }
+svg { display: block; width: 100%; }
+footer { margin-top: 4rem; border-top: 1px solid var(--border);
+  padding-top: 1.25rem; font-size: 13px; color: var(--muted); }
+footer a { color: var(--text2); }
+</style>
+</head>
+<body>
+<main>
+<h1>The political middle: humans vs language models</h1>
+<p class="sub">Are self-identified moderates genuine centrists (Fowler et al. 2023) or
+cross-pressured people whose offsetting extremes only average to the middle
+(Broockman &amp; Lauderdale 2025)? Below: 18,637 GSS respondents (2014–2024) and four
+open-weight language models, measured on the same 14 attitude items with the same ruler.</p>
+
+<section id="sec1">
+<h2>1 · Two theories of the same average person</h2>
+<p class="sub">Both hypothetical people below average to the exact middle of the scale.
+The summary statistic cannot tell them apart — only the per-issue rows can.</p>
+<div class="controls">
+  <button id="btnF">True centrist (Fowler)</button>
+  <button id="btnB">Cross-pressured (Broockman)</button>
+</div>
+<div id="s1"></div>
+<div class="legend">
+  <span><span class="dot" style="background:var(--blue)"></span>liberal end</span>
+  <span><span class="dot" style="background:var(--red)"></span>conservative end</span>
+  <span><span class="sw" style="background:var(--text);transform:rotate(45deg)"></span>this person's average</span>
+</div>
+</section>
+
+<section id="sec2">
+<h2>2 · Real moderates, General Social Survey 2014–2024</h2>
+<p class="sub">Three actual (anonymous) respondents who called themselves moderate,
+and the average over all of them. 65% of real moderates hold at least one
+extreme-liberal and one extreme-conservative position.</p>
+<div id="s2"></div>
+</section>
+
+<section id="sec3">
+<h2>3 · What a model's "moderate" answers</h2>
+<p class="sub">Pick a model and an item: gray bars are the 6,628 real moderates'
+answers; purple bars are the model's "moderate" persona (exact response
+probabilities, order-averaged). Below, the model's 7-point persona ladder against
+the 7 real ideology groups on the same axis.</p>
+<div class="controls"><span id="mbtns" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+  <select id="itemSel"></select></div>
+<div id="s3dist"></div>
+<div class="legend">
+  <span><span class="sw" style="background:var(--gray)"></span>human moderates</span>
+  <span><span class="sw" style="background:var(--violet)"></span>model "moderate" persona</span>
+  <span><span class="dot" style="background:var(--amber)"></span>the middle of each ladder</span>
+</div>
+<div id="s3ladder" style="margin-top:10px"></div>
+<div class="grid14" id="s3grid"></div>
+<p class="note">Small multiples: all 14 items for the selected model. The recurring
+pattern — human mass at the endpoints, model mass on the middle option — is the
+flattening result.</p>
+</section>
+
+<section id="sec4">
+<h2>4 · The measurement artifact worth knowing about</h2>
+<p class="sub">Reversing the on-screen order of the answer options shifts every model's
+<em>content</em> answer — often by more than half the scale. Bars show the size of that
+shift per item for the selected model and persona. Any silicon survey that does not
+randomize option order is measuring letter preference, not politics.</p>
+<div class="controls"><select id="personaSel"></select></div>
+<div id="s4"></div>
+</section>
+
+<section id="sec5">
+<h2>5 · The audit and the estimator</h2>
+<div class="cards">
+  <div class="card"><div class="k">real moderates cross-pressured</div><div class="v">65%</div></div>
+  <div class="card"><div class="k">their near-middle answers</div><div class="v">39%</div></div>
+  <div class="card"><div class="k">model moderates' near-middle</div><div class="v">48–55%</div></div>
+  <div class="card"><div class="k">answer-relevant share of the "independent" direction</div><div class="v">6.8%</div></div>
+</div>
+<p class="sub">Near-middle response share of each middle. The models sit well above the
+human reference line: they portray the Fowlerian average of a Broockman-shaped public.</p>
+<div id="s5bars"></div>
+<p class="sub" style="margin-top:20px">And the estimator test: a surrogate of the
+Fowler et al. mixture model was run on synthetic worlds with known ground truth, on
+the real GSS, and on silicon samples. Its verdict (y) barely moves while the truth
+(x) varies — and silicon middles sit on the Fowler side of the human point no matter
+what the human truth is.</p>
+<div id="s5scatter"></div>
+<div class="legend">
+  <span><span class="dot" style="background:var(--blue)"></span>synthetic world (known truth)</span>
+  <span><span class="sw" style="background:var(--text);transform:rotate(45deg)"></span>GSS humans</span>
+  <span><span class="dot" style="background:var(--red)"></span>silicon sample</span>
+</div>
+</section>
+
+<footer>
+<p>Data: GSS cumulative file 2014–2024 (weighted; 14 ordinal items, empirically
+oriented so 0 = liberal end). Models elicited in completion format with exact
+option-probability readout, 2 frames × 2 option orders per cell; positions are
+order-averaged content positions. Cross-pressured = at least one position ≤ 0.15 and
+one ≥ 0.85 across ≥ 5 answered items; near-middle = |position − 0.5| &lt; 0.17.
+Estimator: 3-class mixture (graded-response ideologue / shared-multinomial
+non-ideologue / uniform). Code: <code>mech_interp_scripts/m_track/</code> and
+<code>dashboard/build_data.py</code> in the llm-liar repository.</p>
+</footer>
+</main>
+
+<script src="data.js"></script>
+<script>
+const D = window.DASHBOARD_DATA;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){ const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e); return e; }
+function posColor(p){
+  const lerp = (a,b,t) => Math.round(a+(b-a)*t);
+  const B=[42,120,214], G=[137,135,129], R=[227,73,72];
+  let c; if (p < 0.5){ const t = p/0.5;
+    c = [lerp(B[0],G[0],t), lerp(B[1],G[1],t), lerp(B[2],G[2],t)]; }
+  else { const t = (p-0.5)/0.5;
+    c = [lerp(G[0],R[0],t), lerp(G[1],R[1],t), lerp(G[2],R[2],t)]; }
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+function strip(parent, label, positions, showMean){
+  const W=880, H=30, x0=200, x1=W-16;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+                         "aria-label": label});
+  const t = el("text", {x:0, y:19, "font-size":"13", fill:"var(--text2)"}, svg);
+  t.textContent = label;
+  el("line", {x1:x0, y1:H/2, x2:x1, y2:H/2, stroke:"var(--border2)"}, svg);
+  el("line", {x1:(x0+x1)/2, y1:6, x2:(x0+x1)/2, y2:H-6, stroke:"var(--border)"}, svg);
+  positions.forEach(p => el("circle",
+    {cx:x0+p*(x1-x0), cy:H/2, r:5.5, fill:posColor(p), opacity:0.85}, svg));
+  if (showMean && positions.length){
+    const mean = positions.reduce((a,b)=>a+b,0)/positions.length;
+    const mx = x0+mean*(x1-x0);
+    el("rect", {x:mx-5, y:H/2-5, width:10, height:10,
+      transform:`rotate(45 ${mx} ${H/2})`, fill:"var(--text)"}, svg);
+  }
+  parent.appendChild(svg);
+}
+
+const s1 = document.getElementById("s1");
+const centrist = [0.45,0.55,0.5,0.42,0.58,0.5,0.46,0.54];
+const crossp   = [0.05,0.95,0.02,0.98,0.08,0.92,0.05,0.95];
+const issueNames = ["Economy","Religion","Welfare","Guns","Immigration","Gender","Environment","Crime"];
+function renderS1(mode){
+  s1.innerHTML = "";
+  const pos = mode === "F" ? centrist : crossp;
+  pos.forEach((p,i) => strip(s1, issueNames[i], [p], false));
+  const W=880, x0=200, x1=W-16;
+  const svg = el("svg", {viewBox:`0 0 ${W} 34`, role:"img",
+    "aria-label":"Average of all eight issues"});
+  const t = el("text", {x:0, y:21, "font-size":"13", "font-weight":"500",
+    fill:"var(--text)"}, svg);
+  t.textContent = "Average of all 8 issues";
+  el("line", {x1:x0, y1:17, x2:x1, y2:17, stroke:"var(--border2)"}, svg);
+  const mean = pos.reduce((a,b)=>a+b,0)/pos.length;
+  const mx = x0+mean*(x1-x0);
+  el("rect", {x:mx-6, y:11, width:12, height:12,
+    transform:`rotate(45 ${mx} 17)`, fill:"var(--text)"}, svg);
+  s1.appendChild(svg);
+  document.getElementById("btnF").className = mode==="F" ? "on" : "";
+  document.getElementById("btnB").className = mode==="B" ? "on" : "";
+}
+document.getElementById("btnF").onclick = () => renderS1("F");
+document.getElementById("btnB").onclick = () => renderS1("B");
+renderS1("B");
+
+const s2 = document.getElementById("s2");
+D.ex.forEach((person,i) =>
+  strip(s2, `Real moderate #${i+1}`, Object.values(person), true));
+strip(s2, `Average of ${D.n_moderates.toLocaleString()} moderates`,
+      D.items.map(it => D.hg["4"][it]), true);
+
+const mbtns = document.getElementById("mbtns");
+const itemSel = document.getElementById("itemSel");
+const personaSel = document.getElementById("personaSel");
+const modelNames = Object.keys(D.models);
+let curModel = modelNames[0], curItem = "eqwlth", curPersona = "id_ext_lib";
+modelNames.forEach(mn => {
+  const b = document.createElement("button");
+  b.textContent = mn;
+  b.onclick = () => { curModel = mn; renderS3(); renderS4(); };
+  mbtns.appendChild(b);
+});
+D.items.forEach(it => {
+  const o = document.createElement("option");
+  o.value = it; o.textContent = D.labels[it];
+  itemSel.appendChild(o);
+});
+itemSel.onchange = () => { curItem = itemSel.value; renderS3(); };
+D.p7.forEach((p,i) => {
+  const o = document.createElement("option");
+  o.value = p; o.textContent = "persona: " + D.p7_labels[i];
+  personaSel.appendChild(o);
+});
+personaSel.onchange = () => { curPersona = personaSel.value; renderS4(); };
+
+function distChart(parent, hp, mp, mini, label){
+  const W = mini ? 210 : 880, H = mini ? 78 : 170;
+  const x0 = mini ? 4 : 40, x1 = W-8, y0 = H-(mini?16:30), top = mini?14:12;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label": (label||"") + " response distribution, humans vs model"});
+  const k = hp.length, slot = (x1-x0)/k,
+        bw = Math.min(mini?9:24, (slot-4)/2);
+  const maxv = Math.max(...hp, ...mp, 0.4);
+  for (let i=0;i<k;i++){
+    const cx = x0 + slot*i + slot/2;
+    const hh = (hp[i]/maxv)*(y0-top), mh = ((mp[i]||0)/maxv)*(y0-top);
+    el("rect", {x:cx-bw-1, y:y0-hh, width:bw, height:Math.max(hh,1),
+      fill:"var(--gray)", rx:2}, svg);
+    el("rect", {x:cx+1, y:y0-mh, width:bw, height:Math.max(mh,1),
+      fill:"var(--violet)", rx:2}, svg);
+    if (!mini){
+      const t = el("text", {x:cx, y:H-16, "font-size":"11",
+        "text-anchor":"middle", fill:"var(--muted)"}, svg);
+      t.textContent = i+1;
+    }
+  }
+  el("line", {x1:x0, y1:y0, x2:x1, y2:y0, stroke:"var(--border2)"}, svg);
+  if (mini){
+    const t = el("text", {x:x0, y:H-4, "font-size":"11", fill:"var(--text2)"}, svg);
+    t.textContent = label;
+  } else {
+    const tl = el("text", {x:x0, y:H-2, "font-size":"11", fill:"var(--blue)"}, svg);
+    tl.textContent = "liberal end";
+    const tr = el("text", {x:x1, y:H-2, "font-size":"11", "text-anchor":"end",
+      fill:"var(--red)"}, svg);
+    tr.textContent = "conservative end";
+  }
+  parent.appendChild(svg);
+}
+function ladder(parent, model){
+  const W=880, H=84, x0=200, x1=W-16;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"Seven point ladder, model personas vs human groups"});
+  [[24, "Model personas 1–7",
+    D.p7.map(p => (D.models[model].pm[p]||{})[curItem]), "var(--violet)"],
+   [60, "GSS ideology groups 1–7",
+    [1,2,3,4,5,6,7].map(g => D.hg[String(g)][curItem]), "var(--gray)"]]
+  .forEach(([y, label, pos, col]) => {
+    const t = el("text", {x:0, y:y+4, "font-size":"13", fill:"var(--text2)"}, svg);
+    t.textContent = label;
+    el("line", {x1:x0, y1:y, x2:x1, y2:y, stroke:"var(--border2)"}, svg);
+    el("line", {x1:(x0+x1)/2, y1:y-9, x2:(x0+x1)/2, y2:y+9,
+      stroke:"var(--border)"}, svg);
+    pos.forEach((p,i) => {
+      if (p === undefined) return;
+      const cx = x0+p*(x1-x0);
+      el("circle", {cx:cx, cy:y, r: i===3?7.5:5.5,
+        fill: i===3 ? "var(--amber)" : col, opacity:0.9}, svg);
+      const n = el("text", {x:cx, y:y+3.5, "font-size":"9",
+        "text-anchor":"middle", fill:"#fff"}, svg);
+      n.textContent = i+1;
+    });
+  });
+  parent.appendChild(svg);
+}
+function renderS3(){
+  const d = document.getElementById("s3dist"); d.innerHTML = "";
+  distChart(d, D.hd[curItem].p,
+    (D.models[curModel].md[curItem]||{}).p || [], false, D.labels[curItem]);
+  const l = document.getElementById("s3ladder"); l.innerHTML = "";
+  ladder(l, curModel);
+  const g = document.getElementById("s3grid"); g.innerHTML = "";
+  D.items.forEach(it => {
+    const cell = document.createElement("div"); cell.className = "cell";
+    distChart(cell, D.hd[it].p, (D.models[curModel].md[it]||{}).p || [],
+      true, D.labels[it]);
+    g.appendChild(cell);
+  });
+  Array.from(mbtns.children).forEach(b =>
+    b.className = b.textContent === curModel ? "on" : "");
+}
+renderS3();
+
+function renderS4(){
+  const s4 = document.getElementById("s4"); s4.innerHTML = "";
+  const shifts = D.models[curModel].shift[curPersona] || {};
+  const rows = D.items.filter(it => shifts[it] !== undefined);
+  const W=880, rowH=26, H=rows.length*rowH+30, x0=240, x1=W-60;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"Answer shift caused by reversing option order, per item"});
+  rows.forEach((it,i) => {
+    const y = i*rowH+6, v = shifts[it], bw = (x1-x0)*Math.min(v,1);
+    const t = el("text", {x:0, y:y+12, "font-size":"12", fill:"var(--text2)"}, svg);
+    t.textContent = D.labels[it];
+    el("rect", {x:x0, y:y, width:bw, height:15, rx:3, fill:"var(--amber)"}, svg);
+    const v2 = el("text", {x:x0+bw+6, y:y+12, "font-size":"12",
+      fill:"var(--text)"}, svg);
+    v2.textContent = Math.round(v*100) + "%";
+  });
+  const avg = rows.reduce((a,it)=>a+shifts[it],0)/Math.max(rows.length,1);
+  const t = el("text", {x:x0, y:H-6, "font-size":"12", fill:"var(--muted)"}, svg);
+  t.textContent = `average shift: ${Math.round(avg*100)}% of the scale (${curModel})`;
+  s4.appendChild(svg);
+}
+renderS4();
+
+(function(){
+  const s5 = document.getElementById("s5bars");
+  const rows = Object.keys(D.audit);
+  const W=880, rowH=30, H=rows.length*rowH+26, x0=200, x1=W-70;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"Near-middle response share, humans vs models"});
+  const ref = D.audit["GSS humans"].nm;
+  rows.forEach((r,i) => {
+    const y=i*rowH+6, v=D.audit[r].nm, bw=(x1-x0)*v/0.6;
+    const t = el("text", {x:0, y:y+13, "font-size":"12", fill:"var(--text2)"}, svg);
+    t.textContent = r;
+    el("rect", {x:x0, y:y, width:bw, height:18, rx:3,
+      fill: r === "GSS humans" ? "var(--gray)" : "var(--violet)"}, svg);
+    const v2 = el("text", {x:x0+bw+6, y:y+13, "font-size":"12",
+      "font-weight":"500", fill:"var(--text)"}, svg);
+    v2.textContent = Math.round(v*100) + "%";
+  });
+  const rx = x0+(x1-x0)*ref/0.6;
+  el("line", {x1:rx, y1:2, x2:rx, y2:H-20, stroke:"var(--red)",
+    "stroke-width":1.5, "stroke-dasharray":"4 3"}, svg);
+  const rt = el("text", {x:rx+5, y:H-8, "font-size":"11", fill:"var(--red)"}, svg);
+  rt.textContent = "real moderates (39%)";
+  s5.appendChild(svg);
+})();
+
+(function(){
+  const s = document.getElementById("s5scatter");
+  if (!D.payoff.length) return;
+  const W=880, H=380, x0=60, x1=W-30, y0=H-46, y1=18;
+  const xmin=0, xmax=0.65, ymin=0, ymax=1.0;
+  const X = v => x0+(v-xmin)/(xmax-xmin)*(x1-x0);
+  const Y = v => y0-(v-ymin)/(ymax-ymin)*(y0-y1);
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"Estimator verdict vs data-level audit for all populations"});
+  for (let v=0; v<=1.0001; v+=0.25){
+    el("line", {x1:x0, y1:Y(v), x2:x1, y2:Y(v), stroke:"var(--border)"}, svg);
+    const t = el("text", {x:x0-8, y:Y(v)+4, "font-size":"11",
+      "text-anchor":"end", fill:"var(--muted)"}, svg);
+    t.textContent = v.toFixed(2);
+  }
+  for (let v=0; v<=0.6001; v+=0.1){
+    const t = el("text", {x:X(v), y:H-28, "font-size":"11",
+      "text-anchor":"middle", fill:"var(--muted)"}, svg);
+    t.textContent = v.toFixed(1);
+  }
+  const xl = el("text", {x:(x0+x1)/2, y:H-8, "font-size":"12",
+    "text-anchor":"middle", fill:"var(--text2)"}, svg);
+  xl.textContent = "near-middle response share of the middle group (audit; Fowler-shaped →)";
+  const yl = el("text", {x:14, y:(y0+y1)/2, "font-size":"12",
+    "text-anchor":"middle", fill:"var(--text2)",
+    transform:`rotate(-90 14 ${(y0+y1)/2})`}, svg);
+  yl.textContent = "estimator's ideologue share (verdict)";
+  D.payoff.forEach(p => {
+    const x = X(p.near_middle_share), y = Y(p.est_ideologue_share);
+    if (p.kind === "human"){
+      el("rect", {x:x-7, y:y-7, width:14, height:14,
+        transform:`rotate(45 ${x} ${y})`, fill:"var(--text)"}, svg);
+    } else {
+      el("circle", {cx:x, cy:y, r:6,
+        fill: p.kind === "silicon" ? "var(--red)" : "var(--blue)",
+        opacity:0.9}, svg);
+    }
+    const t = el("text", {x:x+9, y:y+4, "font-size":"11",
+      fill:"var(--text2)"}, svg);
+    t.textContent = p.name.replace("synthetic ","").replace("silicon ","");
+  });
+  s.appendChild(svg);
+})();
+</script>
+</body>
+</html>
