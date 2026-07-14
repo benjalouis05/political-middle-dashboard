@@ -105,6 +105,7 @@ and zero directions. Charts show nulls there.</p>
 <button id="tabA" class="on">A · How many dimensions?</button>
 <button id="tabB">B · Decodable vs causal</button>
 <button id="tabC">C · Where it lives</button>
+<button id="tabD">D · Limits of vectors</button>
 </div>
 
 <section id="paneA">
@@ -338,6 +339,75 @@ experiments at decoder layer 19 hit a ceiling.</p>
 </div>
 </section>
 
+<section id="paneD" style="display:none">
+<p class="sub">Can any vector recipe make the liberal persona answer like the
+conservative one? We tried the strongest versions — a 7-coefficient multi-layer
+recipe fitted by an optimizer, question-specific directions, item-specific
+residuals — and compared them against activation <em>patching</em> (copying the
+conservative run's actual internal state), which is the informational upper
+bound. The scoreboard is <b>top-answer fidelity</b>: how often the intervened
+model gives the exact answer the real conservative persona gives.</p>
+<div class="cards">
+<div class="card"><div class="k">best vector recipe (fidelity vs baseline)</div><div class="v" id="d_bestvec">–</div></div>
+<div class="card"><div class="k">patching, single layer 31</div><div class="v" id="d_patch">–</div></div>
+<div class="card"><div class="k">fitted recipe: train → held-out gap closed</div><div class="v" id="d_gap">–</div></div>
+</div>
+<details>
+<summary>The two experiments in brief</summary>
+<p><b>Fitted multi-layer steering:</b> an optimizer searched 7 per-layer
+coefficients (layers 17–33, directions from 40 training items only), minimizing
+distance to the conservative persona's answer distributions, then was scored on
+18 items it never saw. It repaired the caricature damage of single-layer
+steering and moved distributions 35% closer — but its held-out top-answer
+fidelity is <em>identical to doing nothing</em>, and its in-sample performance
+collapsed out of sample (the classic tuned-recipe trap).</p>
+<p><b>Patching:</b> instead of adding a direction, copy the conservative run's
+activation into the liberal run. Copying one token (the final position) at one
+layer (31) reproduces the conservative's answers at 95%. The same copy at layers
+11–23 does nothing — the item-specific answer state materializes at the final
+token between layers ~23 and 31. Because patching uses the same intervention
+site as steering and differs only in <em>what</em> is injected, the vector
+ceiling is informational (a question-blind direction can't carry per-question
+answers), not procedural (no layer schedule fixes it).</p>
+<p><b>The shared vector and its residuals:</b> the mean of all 58 item
+directions and their first principal component are the same vector
+(cosine 0.9965) — the "shared conservative vector" is unique and is what all
+steering used. A median 59% of each item's direction is item-specific residual;
+steering each question with its <em>own residual</em> is the only vector
+condition that beats baseline fidelity — by a sliver (+0.09), recovering under
+a fifth of the headroom patching proves exists.</p>
+</details>
+<p class="sub" style="margin-top:14px">The fidelity leaderboard. Two blocks
+because the experiments used different item sets — each has its own do-nothing
+baseline (dashed line). Purple = vector recipes, teal = patching, gray =
+baselines and random controls.</p>
+<div id="dLeader"></div>
+<div class="legend">
+<span><span class="sw" style="background:var(--gray)"></span>baseline / random control</span>
+<span><span class="sw" style="background:var(--violet)"></span>vector steering</span>
+<span><span class="sw" style="background:var(--teal)"></span>activation patching</span>
+<span><span class="sw" style="background:var(--blue)"></span>prompt swap (equivalent of asking)</span>
+</div>
+<div class="row2" style="margin-top:20px">
+<div>
+<p class="sub">Where the answer state lives: patch the final token at a single
+layer and measure fidelity. Nothing until ~layer 23; nearly everything by 31.</p>
+<div id="dPatchDepth"></div>
+</div>
+<div>
+<p class="sub">What the optimizer chose: fitted per-layer coefficients. It
+zeroed layers 17 and 21 on its own — agreeing that early pushes are useless.</p>
+<div id="dAlphas"></div>
+<p class="note" id="dGapNote"></p>
+</div>
+</div>
+<p class="sub" style="margin-top:20px">The shared vector's direct vocabulary
+footprint (logit lens, approximate): mostly non-words — it lives in the
+network's internal subspace, which is why it steers computation rather than
+naming conservative things. Note what it suppresses.</p>
+<div id="dLens"></div>
+</section>
+
 <footer>
 <p><b>Methods in one paragraph.</b> Model: Qwen2.5-3B-Instruct, completion-format
 prompts, exact option-letter probability readout (no sampling). Directions:
@@ -494,7 +564,7 @@ function lineChart(container, series, opts){
   container.appendChild(svg);
 }
 
-const panes = {tabA:"paneA", tabB:"paneB", tabC:"paneC"};
+const panes = {tabA:"paneA", tabB:"paneB", tabC:"paneC", tabD:"paneD"};
 Object.keys(panes).forEach(id=>{
   document.getElementById(id).onclick = ()=>{
     Object.keys(panes).forEach(j=>{
@@ -909,6 +979,148 @@ document.getElementById("layerC").oninput = e=>{
   sel.onchange = renderEx;
   slider.oninput = renderEx;
   renderEx();
+})();
+
+(function(){
+  const L = D.limits;
+  if (!L || !L.ultimate || !L.shared) return;
+  const U = L.ultimate.conditions, S = L.shared.steering;
+  const baseAll = L.shared.unsteered_top_match;
+  const baseTest = U.test_unsteered.top_match;
+
+  document.getElementById("d_bestvec").textContent =
+    (S.own_residual_c2.top_match*100).toFixed(0) + "% vs "
+    + (baseAll*100).toFixed(0) + "%";
+  document.getElementById("d_patch").textContent =
+    (U.P_final_L31.top_match*100).toFixed(0) + "%";
+  document.getElementById("d_gap").textContent =
+    U.train_fitted.median_gap_closed.toFixed(2) + " → "
+    + U.test_fitted.median_gap_closed.toFixed(2);
+
+  const V = "var(--violet)", T = "var(--teal)", G = "var(--gray)",
+        B = "var(--blue)";
+  const blocks = [
+    {title: "held-out test set (18 items) — the fitted-recipe experiment",
+     base: baseTest,
+     rows: [
+       ["do nothing (baseline)", U.test_unsteered.top_match, G],
+       ["single-layer L29, c=2", U.test_single_L29_c2.top_match, V],
+       ["fitted 7-layer recipe", U.test_fitted.top_match, V],
+       ["random stacks (mean of 3)", (U.test_random_stack_0.top_match
+         + U.test_random_stack_1.top_match
+         + U.test_random_stack_2.top_match)/3, G]]},
+    {title: "all 58 items — payload comparison at c=2, and patching",
+     base: baseAll,
+     rows: [
+       ["do nothing (baseline)", baseAll, G],
+       ["shared vector (global mean)", S.global_mean_c2.top_match, V],
+       ["PC1 (same vector)", S.pc1_c2.top_match, V],
+       ["own item direction", S.own_direction_c2.top_match, V],
+       ["own item residual", S.own_residual_c2.top_match, V],
+       ["patch final token, layer 23", U.P_final_L23.top_match, T],
+       ["patch final token, layer 27", U.P_final_L27.top_match, T],
+       ["patch final token, layer 31", U.P_final_L31.top_match, T],
+       ["patch final token, layers 20-32", U.P_final_band.top_match, T],
+       ["swap persona word (≈ prompting)", U.P_embed.top_match, B]]},
+  ];
+  const cont = document.getElementById("dLeader");
+  cont.innerHTML = "";
+  const W = 900, rowH = 24, x0 = 250, x1 = W-60;
+  let rowsTotal = blocks.reduce((a,b)=>a+b.rows.length+1.4, 0);
+  const H = rowsTotal*rowH + 10;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"fidelity leaderboard: vector recipes vs patching"});
+  let y = 4;
+  blocks.forEach(bl=>{
+    const t = el("text", {x:0, y:y+14, "font-size":"12", "font-weight":"500",
+      fill:"var(--text)"}, svg);
+    t.textContent = bl.title;
+    y += rowH;
+    const y0b = y;
+    bl.rows.forEach(([label, v, col])=>{
+      const tx = el("text", {x:0, y:y+14, "font-size":"12",
+        fill:"var(--text2)"}, svg);
+      tx.textContent = label;
+      const r = el("rect", {x:x0, y:y+3, width:(x1-x0)*v, height:15, rx:3,
+        fill:col}, svg);
+      tip(r, `${label}: top-answer match ${(v*100).toFixed(1)}%`);
+      const vt = el("text", {x:x0+(x1-x0)*v+6, y:y+15, "font-size":"12",
+        "font-weight":"500", fill:"var(--text)"}, svg);
+      vt.textContent = Math.round(v*100) + "%";
+      y += rowH;
+    });
+    const bx = x0+(x1-x0)*bl.base;
+    el("line", {x1:bx, y1:y0b, x2:bx, y2:y-4, stroke:"var(--red)",
+      "stroke-width":1.5, "stroke-dasharray":"4 3"}, svg);
+    y += rowH*0.4;
+  });
+  cont.appendChild(svg);
+
+  const depth = [["L11", U.P_final_L11.top_match],
+                 ["L19", U.P_final_L19.top_match],
+                 ["L23", U.P_final_L23.top_match],
+                 ["L27", U.P_final_L27.top_match],
+                 ["L31", U.P_final_L31.top_match]];
+  barChart(document.getElementById("dPatchDepth"),
+    depth.map(d=>d[1]), depth.map(d=>"patch at " + d[0]),
+    depth.map(()=> "var(--teal)"),
+    {w:440, rowH:24, x0:90, max:1,
+     title:"top-answer match, single-layer final-token patch",
+     aria:"patch depth sweep"});
+
+  (function(){
+    const cont2 = document.getElementById("dAlphas");
+    cont2.innerHTML = "";
+    const layers = L.ultimate.fit_layers, alphas = L.ultimate.fitted_alphas;
+    const W2 = 440, H2 = 160, x0b = 40, x1b = W2-14, y0b = H2-28,
+          ymid = (y0b+16)/2 + 8;
+    const svg2 = el("svg", {viewBox:`0 0 ${W2} ${H2}`, role:"img",
+      "aria-label":"fitted per-layer coefficients"});
+    const amax = Math.max(...alphas.map(Math.abs), 0.1);
+    el("line", {x1:x0b, y1:ymid, x2:x1b, y2:ymid,
+      stroke:"var(--border2)"}, svg2);
+    const slot = (x1b-x0b)/layers.length;
+    layers.forEach((Ly,i)=>{
+      const a = alphas[i], h = Math.abs(a)/amax*(ymid-20);
+      const r = el("rect", {x:x0b+slot*i+slot*0.2,
+        y: a >= 0 ? ymid-h : ymid, width:slot*0.6, height:Math.max(h,1),
+        rx:2, fill:"var(--violet)"}, svg2);
+      tip(r, `layer ${Ly}: α = ${a.toFixed(2)}`);
+      const t = el("text", {x:x0b+slot*i+slot/2, y:H2-12, "font-size":"11",
+        "text-anchor":"middle", fill:"var(--muted)"}, svg2);
+      t.textContent = "L" + Ly;
+      const vt = el("text", {x:x0b+slot*i+slot/2,
+        y: a >= 0 ? ymid-h-4 : ymid+h+11, "font-size":"10",
+        "text-anchor":"middle", fill:"var(--text2)"}, svg2);
+      vt.textContent = a.toFixed(2);
+    });
+    cont2.appendChild(svg2);
+    document.getElementById("dGapNote").textContent =
+      `Generalization check: the fitted recipe closed `
+      + `${U.train_fitted.median_gap_closed.toFixed(2)} of the gap on its `
+      + `training items but only ${U.test_fitted.median_gap_closed.toFixed(2)} `
+      + `held-out — and its held-out fidelity `
+      + `(${Math.round(U.test_fitted.top_match*100)}%) exactly equals doing `
+      + `nothing (${Math.round(baseTest*100)}%).`;
+  })();
+
+  (function(){
+    const cont3 = document.getElementById("dLens");
+    cont3.innerHTML = "";
+    const mk = (title, toks, hl) => {
+      const div3 = document.createElement("div");
+      div3.style.cssText = "margin:4px 0;font-size:13px;color:var(--text2)";
+      div3.innerHTML = `<b style="color:var(--text)">${title}</b> ` +
+        toks.map(t => `<span style="display:inline-block;background:var(--card);`
+          + `border-radius:6px;padding:1px 8px;margin:2px;`
+          + (t === hl ? "border:1.5px solid var(--red);" : "")
+          + `">${t.replace(/</g,"&lt;")}</span>`).join("");
+      return div3;
+    };
+    cont3.appendChild(mk("promotes:", L.shared.logit_lens_promotes, null));
+    cont3.appendChild(mk("suppresses:", L.shared.logit_lens_suppresses,
+                         "moderate"));
+  })();
 })();
 </script>
 </body>
