@@ -22,6 +22,7 @@ body { margin: 0; background: var(--bg); color: var(--text);
 main { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
 h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
 h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+section { margin-top: 2rem; }
 p.sub { color: var(--text2); font-size: 14px; margin: 0 0 14px; }
 p.note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
 a { color: var(--text2); }
@@ -32,7 +33,6 @@ button:hover { background: var(--card); }
 button.on { border-color: var(--text); }
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 1.5rem 0 0; }
 .tabs button { padding: 8px 16px; font-size: 14px; }
-section { margin-top: 2rem; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px; margin: 0 0 14px; }
 .card { background: var(--card); border-radius: 10px; padding: 0.9rem 1rem; }
@@ -40,16 +40,23 @@ section { margin-top: 2rem; }
 .card .v { font-size: 24px; font-weight: 500; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 @media (max-width: 760px) { .row2 { grid-template-columns: 1fr; } }
-.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px;
-  color: var(--text2); margin: 4px 0 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px;
+  color: var(--text2); margin: 6px 0 0; }
 .legend span { display: flex; align-items: center; gap: 5px; }
-.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
 canvas.heat { width: 100%; image-rendering: pixelated; border: 1px solid var(--border); }
 svg { display: block; width: 100%; }
 input[type=range] { width: 240px; }
 .sliderrow { display: flex; align-items: center; gap: 12px; margin: 8px 0;
-  font-size: 13px; color: var(--text2); }
+  font-size: 13px; color: var(--text2); flex-wrap: wrap; }
+details { margin: 10px 0 16px; border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; }
+details summary { cursor: pointer; font-size: 14px; font-weight: 500;
+  color: var(--text); }
+details p, details li { font-size: 14px; color: var(--text2); }
+details code { font-size: 13px; background: var(--card); padding: 1px 5px;
+  border-radius: 4px; }
 footer { margin-top: 4rem; border-top: 1px solid var(--border);
   padding-top: 1.25rem; font-size: 13px; color: var(--muted); }
 </style>
@@ -59,9 +66,40 @@ footer { margin-top: 4rem; border-top: 1px solid var(--border);
 <h1>Inside the model: the geometry of political knowledge</h1>
 <p class="sub">Qwen2.5-3B-Instruct, 58 GSS-style attitude items, residual-stream
 activations at every layer. Companion to
-<a href="index.html">the behavioral dashboard</a>: is politics one direction
-inside the model, or many? And which of those directions actually control
+<a href="index.html">the behavioral dashboard</a>. The behavioral page showed that
+this model portrays political moderates as tidy centrists, while real moderates are
+mostly cross-pressured — extreme on different issues in opposite directions. That
+debate is, at bottom, about <em>dimensionality</em>: is political opinion one axis or
+many? This page asks that question about the model's own internals: is politics one
+direction in its activation space, or many — and which directions actually cause
 answers?</p>
+
+<details>
+<summary>How the raw material is made (read this first)</summary>
+<p>Every measurement on this page starts the same way. We show the model a survey
+question with lettered options and the frame "<em>A randomly selected politically
+liberal US adult would answer (give the single letter):</em>", and we record two
+things from a single forward pass:</p>
+<ul>
+<li><b>The answer:</b> the model's probability for each option letter at the final
+position — its exact response distribution, no sampling.</li>
+<li><b>The thought:</b> the residual-stream activation (a 2,048-number vector) at
+that final position, captured at every one of the model's 36 layers. This vector is
+the model's entire working state at the moment it answers.</li>
+</ul>
+<p>Doing this for 4 personas (liberal, conservative, independent, moderate) × 58
+items × 37 depths gives a complete map of how the model represents "a liberal
+answering the gun question," "a conservative answering the abortion question," and
+so on. A <b>direction</b> is a difference between two such vectors: for example,
+the <em>partisan direction for the gun item</em> = (conservative activation) −
+(liberal activation) on that item. It points from "thinking like a liberal" to
+"thinking like a conservative" about guns, inside the model's activation space.</p>
+<p><b>Depth convention:</b> we index depth by residual-stream row R = 0…36, where
+row 0 is the token embedding (before any layer runs) and row R is the output of
+decoder layer R−1. Row 0 is degenerate by construction — the final prompt token is
+the same character for every persona, so all personas have identical row-0 vectors
+and zero directions. Charts show nulls there.</p>
+</details>
 
 <div class="tabs">
 <button id="tabA" class="on">A · How many dimensions?</button>
@@ -73,84 +111,189 @@ answers?</p>
 <div class="cards">
 <div class="card"><div class="k">model: share of direction field on one axis</div><div class="v" id="a_pc1">–</div></div>
 <div class="card"><div class="k">humans: share of attitude structure on one axis</div><div class="v" id="a_hpc1">–</div></div>
-<div class="card"><div class="k">within-topic vs between-topic cosine</div><div class="v" id="a_wb">–</div></div>
+<div class="card"><div class="k">within-topic vs between-topic cosine <span id="a_wb_layer"></span></div><div class="v" id="a_wb">–</div></div>
 </div>
-<p class="sub">Each of the 58 items gets a partisan direction: conservative
-activation minus liberal activation at layer 19. Left: cosine similarity between
-every pair of item directions, ordered by topic (topic bands on the axes). Right:
-the human benchmark — correlations between real respondents' answers on the GSS
-items, same ordering logic. If politics were one internal axis, the left matrix
-would be uniformly dark; if human attitudes were one dimension, so would the right.</p>
+<p class="sub">Each item gets a partisan direction at depth row 20 (decoder layer 19,
+mid-network). <b>Left:</b> the cosine similarity between every pair of item
+directions — +1 means "same direction," 0 means unrelated — ordered so items of the
+same topic sit together (colored bands on the axes). <b>Right:</b> the human
+benchmark: correlations between real respondents' answers across the 14 GSS-mapped
+items, same topic ordering. What to look for: if politics were a single internal
+axis, the left matrix would be one uniform dark block; if human attitudes were one
+dimension, the right one would be too. The left matrix <em>is</em> nearly uniform;
+the right one has a bright diagonal and visible topic blocks.</p>
 <div class="row2">
 <div><canvas id="heatModel" class="heat"></canvas>
-<p class="note" id="heatModelCap">Model: item-direction cosines, layer 19.</p></div>
+<p class="note">Model: item-direction cosines (58 × 58), row 20. Uniformly light
+blue ≈ every issue shares one internal direction.</p>
+<div class="legend" id="topicLegendModel"></div></div>
 <div><canvas id="heatHuman" class="heat"></canvas>
-<p class="note">Humans: inter-item response correlations (GSS 2014–2024,
-14 mapped items).</p></div>
+<p class="note">Humans: inter-item response correlations, GSS 2014–2024 (14 × 14;
+cells with fewer than 200 co-respondents shown as 0). Blocks = domain structure.</p>
+<div class="legend" id="topicLegendHuman"></div></div>
 </div>
-<div class="row2" style="margin-top:20px">
+<details>
+<summary>How to read these two matrices — and one honest caveat</summary>
+<p>The model matrix asks: "does the model <em>move its internal state</em> the same
+way when switching liberal→conservative on item X as on item Y?" Cosine similarity
+between the two item directions answers that: near 1 = same internal move.
+The human matrix asks the closest question real survey data can answer: "do people
+who give conservative answers on X also give conservative answers on Y?" — the
+correlation between items across 18,637 respondents.</p>
+<p><b>Caveat:</b> these are analogous, not identical, quantities (a similarity of
+internal directions vs a correlation of behavioral responses). The comparison is
+fair in one specific sense: both measure how much the item-level structure collapses
+onto one dimension, and both are summarized the same way — by the share of variance
+on the first principal component (the bars below). Model: one component carries
+~79%. Humans: ~31%, with real second and third dimensions.</p>
+</details>
+<div class="row2" style="margin-top:8px">
 <div id="screeModel"></div>
 <div id="screeHuman"></div>
 </div>
-<div class="sliderrow"><span>layer</span>
-<input type="range" id="layerA" min="0" max="36" step="2" value="19">
-<span id="layerAv">19</span>
-<span style="color:var(--muted)">PC1 share and topic structure by depth below</span></div>
+<p class="sub" style="margin-top:16px">And by depth: the red line is the one-axis
+share (PC1) of the direction field at each row; teal and gray are the average
+within-topic and between-topic cosines. The single axis appears almost immediately
+(≈98% at row 2) and only slowly diversifies. Note the teal and gray lines are nearly
+identical everywhere — topic membership barely matters to the geometry at any depth.</p>
+<div class="sliderrow"><span>depth row</span>
+<input type="range" id="layerA" min="0" max="36" step="2" value="20">
+<span id="layerAv">20</span><span id="layerAd" style="color:var(--muted)">(decoder layer 19)</span></div>
 <div id="dimByLayer"></div>
+<div class="legend">
+<span><span class="sw" style="background:var(--red)"></span>PC1 share of direction field</span>
+<span><span class="sw" style="background:var(--teal)"></span>mean within-topic cosine</span>
+<span><span class="sw" style="background:var(--gray)"></span>mean between-topic cosine</span>
+<span><span class="sw" style="background:var(--border2)"></span>selected row (slider)</span>
+</div>
 </section>
 
 <section id="paneB" style="display:none">
 <div class="cards">
-<div class="card"><div class="k">partisan direction: answer-relevant fraction (median)</div><div class="v" id="b_ansf">–</div></div>
-<div class="card"><div class="k">independent offset: answer-relevant fraction (median)</div><div class="v" id="b_iansf">–</div></div>
-<div class="card"><div class="k">cross-topic steering transfer</div><div class="v" id="b_transfer">–</div></div>
+<div class="card"><div class="k">partisan direction: answer-relevant fraction (median item)</div><div class="v" id="b_ansf">–</div></div>
+<div class="card"><div class="k">independent offset: answer-relevant fraction (median item)</div><div class="v" id="b_iansf">–</div></div>
+<div class="card"><div class="k">cross-topic transfer (own vs other topics)</div><div class="v" id="b_transfer">–</div></div>
 </div>
-<p class="sub">The causal test. We steer a liberal run along one topic's partisan
-direction and measure the shift toward conservative answers on every topic's
-items. Rows are the steering direction, columns the items being tested; a dark
-diagonal with light off-diagonal would mean separate per-topic knowledge; a
-uniformly dark matrix means one shared causal axis.</p>
-<div class="sliderrow"><span>strength c</span><span id="cBtns" style="display:flex;gap:6px"></span></div>
-<div id="transferWrap"><canvas id="heatTransfer" class="heat"></canvas>
-<p class="note" id="transferCap">Steering transfer matrix (oriented shift toward
-conservative, in scale units).</p></div>
-<p class="sub" style="margin-top:20px">Per-item answer-relevant fractions at
-layer 19: how much of each direction's magnitude lies in the span of the option-letter
-unembeddings (the only part that can move a forced-choice answer).</p>
+<p class="sub">Tab A showed the <em>representational</em> answer: one axis. This tab
+asks the <em>causal</em> questions. First: can these directions move answers at all?
+Second: when they do, is the causal influence one shared axis or per-topic?</p>
+<details>
+<summary>What "answer-relevant fraction" means</summary>
+<p>The model produces its answer by multiplying its final activation by the
+unembedding vectors of the option letters A–J. Only the part of a direction that
+lies in the (at most 9-dimensional) span of those letter vectors can change a
+forced-choice answer; the other ~2,039 dimensions are invisible to this readout.
+The <b>answer-relevant fraction</b> is the share of a direction's length inside
+that span. The earlier steering study found the "independent" concept was ~93%
+outside it; the bars below show the same is true of the <em>partisan</em>
+directions (median ≈ 5% inside). A direction can carry lots of information and
+still barely touch the answer — most of what the model "knows" here is stored in
+directions the answer machinery never reads.</p>
+</details>
+<details>
+<summary>What the steering experiment does, exactly</summary>
+<p>Steering is a causal intervention: run the liberal-persona prompt, and at one
+decoder layer add <code>c × direction</code> to the layer's output at every
+position, then read the option probabilities as usual. If answers shift toward
+the conservative pattern, the direction causally controls the answer; the strength
+<code>c</code> scales the push. Directions are built per topic (the average of
+that topic's item directions — only topics with ≥3 items get one) plus one
+<b>global</b> direction (average over all 58 items).</p>
+<p>Each matrix cell below = steer with the <b>row's</b> direction, measure the
+average answer shift on the <b>column's</b> items, oriented so red = toward the
+conservative pole of that item (blue = toward liberal). "Oriented" uses each
+item's own polarity: the sign of the model's unsteered conservative−liberal gap
+on that item. The buttons switch strength (c) and depth (L = decoder layer). Two
+depths matter: L19 (mid-network, where the representation is strong) and L29
+(late, where — as tab C shows — steering actually works).</p>
+<p><b>The dimensionality reading:</b> if the model kept separate per-topic
+knowledge, the matrix would have a dark diagonal (each topic direction moves only
+its own topic). Instead, at L29 every row moves every column: one shared causal
+axis. Own-topic cells average 0.33 scale units, other-topic cells 0.25 — cross-topic
+transfer is 77% of own-topic. At L19 all effects are near zero (the causal handle
+does not exist there yet), which is itself a finding: don't test causality at the
+layer where decodability peaks.</p>
+</details>
+<div class="sliderrow"><span>strength · depth</span><span id="cBtns" style="display:flex;gap:6px;flex-wrap:wrap"></span></div>
+<div id="transferWrap"></div>
+<div class="legend">
+<span><span class="sw" style="background:var(--red)"></span>shift toward the item's conservative pole</span>
+<span><span class="sw" style="background:var(--blue)"></span>shift toward the liberal pole</span>
+<span style="color:var(--muted)">hover a cell for the exact value</span>
+</div>
+<p class="sub" style="margin-top:20px">Per-item answer-relevant fractions at row 20.
+Red: the item's partisan direction (con − lib). Purple: its independent offset
+(ind − lib). Almost everything is under 10%: the option-letter readout is a narrow
+keyhole, and nearly all persona structure lives outside it.</p>
 <div id="ansFracChart"></div>
 <div class="legend">
 <span><span class="sw" style="background:var(--red)"></span>partisan direction (con − lib)</span>
 <span><span class="sw" style="background:var(--violet)"></span>independent offset (ind − lib)</span>
+<span style="color:var(--muted)">hover a bar for the item wording</span>
 </div>
 </section>
 
 <section id="paneC" style="display:none">
-<p class="sub">The persona map: activations of the four personas across all 58
-items (question identity removed), projected to 2-D, with a layer slider. Then the
-depth curves: when concepts become decodable, when personas separate, and where
-steering actually works.</p>
-<div class="sliderrow"><span>layer</span>
+<p class="sub">Where in the network does all this live? The map shows the four
+personas' activations across all 58 items (item identity subtracted out, so what
+remains is pure persona information), projected to 2-D at the chosen depth. Drag
+the slider: at row 0 everything is one point (identical final token); separation
+appears within a few layers; by mid-network the four personas form clean clusters.</p>
+<div class="sliderrow"><span>depth row</span>
 <input type="range" id="layerC" min="0" max="36" step="2" value="20">
-<span id="layerCv">20</span></div>
+<span id="layerCv">20</span><span id="layerCd" style="color:var(--muted)">(decoder layer 19)</span></div>
 <div id="personaMap"></div>
 <div class="legend" id="personaLegend"></div>
-<div id="depthCurves" style="margin-top:20px"></div>
+<details>
+<summary>Reading the depth curves below</summary>
+<ul>
+<li><b>Blue — probe accuracy:</b> can a linear classifier told nothing about the
+items separate liberal from conservative activations on <em>held-out</em> items?
+(6-fold cross-validation over items.) It can, nearly perfectly, from the first few
+rows: the information is <em>decodable</em> almost everywhere.</li>
+<li><b>Teal — persona separability:</b> distance between persona clusters relative
+to their spread (scaled to its own maximum for display).</li>
+<li><b>Purple — independent's off-axis fraction:</b> the share of the
+independent−liberal offset that is <em>not</em> along the item's lib–con axis; the
+"independent is its own concept" signature, present at all depths.</li>
+<li><b>Amber — steering effect:</b> the answer shift from pushing along the global
+partisan direction (c = 4) at that depth, scaled to its maximum. This is the
+<em>causal</em> curve — and it is near zero until row ~20, peaking around row 30.</li>
+</ul>
+<p>The twenty-row gap between the blue and amber curves is the page's second
+finding: <b>decodable early, causal late</b>. The mid-network "knows" the politics
+(probes read it perfectly) but interventions there barely move answers; the control
+surface that answers actually flow through sits in the last third of the network.
+This also explains, in hindsight, why the earlier independent-persona steering
+experiments at decoder layer 19 hit a ceiling.</p>
+</details>
+<div id="depthCurves" style="margin-top:8px"></div>
 <div class="legend">
-<span><span class="sw" style="background:var(--blue)"></span>probe accuracy (lib vs con, held-out items)</span>
-<span><span class="sw" style="background:var(--teal)"></span>persona separability</span>
+<span><span class="sw" style="background:var(--blue)"></span>probe accuracy (held-out items)</span>
+<span><span class="sw" style="background:var(--teal)"></span>persona separability (relative)</span>
 <span><span class="sw" style="background:var(--violet)"></span>independent off-axis fraction</span>
-<span><span class="sw" style="background:var(--amber)"></span>steering shift (global direction, c=4)</span>
+<span><span class="sw" style="background:var(--amber)"></span>steering shift, global direction c=4 (relative)</span>
 </div>
 </section>
 
 <footer>
-<p>All directions are residual-stream differences of persona-conditioned
-activations at the final prompt token. Answer-relevant fraction = norm fraction
-of a direction inside the centered span of the option-letter unembeddings.
-Steering = adding c·direction to the output of a decoder layer during a single
-forward pass, liberal source persona, exact option-probability readout. Human
-benchmark: weighted inter-item correlations, GSS 2014–2024. Code:
-<code>mech_interp_scripts/m_track/vector_*.py</code> in the llm-liar repo.</p>
+<p><b>Methods in one paragraph.</b> Model: Qwen2.5-3B-Instruct, completion-format
+prompts, exact option-letter probability readout (no sampling). Directions:
+differences of persona-conditioned residual-stream activations at the final prompt
+token, per item, per depth row (row R = output of decoder layer R−1; row 0 =
+embeddings, degenerate by construction). Dimensionality: PCA on the 58
+length-normalized item directions; human benchmark is the eigen-spectrum of the
+weighted inter-item correlation matrix, GSS 2014–2024 (analogous, not identical,
+quantities). Answer-relevant fraction: norm share inside the centered span of the
+option-letter unembeddings. Steering: add c·direction to one decoder layer's output
+at every position during a single forward pass, liberal source persona; shifts are
+oriented per item by the sign of the model's own conservative−liberal behavioral
+gap (items with near-zero gaps contribute noise). Battery: 60 GSS-style items
+(2 meta items excluded), 17 topics; topic steering directions exist only for topics
+with ≥3 items. Code: <code>mech_interp_scripts/m_track/vector_*.py</code> and
+<code>battery60.py</code>; raw artifacts in
+<code>results/m_track/vector_explorer/</code> of the llm-liar repo. Findings
+summary: <code>FINDINGS.md</code> there.</p>
 </footer>
 </main>
 
@@ -158,52 +301,64 @@ benchmark: weighted inter-item correlations, GSS 2014–2024. Code:
 <script>
 const D = window.VEC_DATA;
 const SVGNS = "http://www.w3.org/2000/svg";
+const fin = v => typeof v === "number" && Number.isFinite(v);
 function el(t, a, p){ const e = document.createElementNS(SVGNS, t);
   for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function tip(node, text){ const t = el("title", {}, node); t.textContent = text; }
 function seq(v, lo, hi){
   const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
-  const c0 = [252,252,251], c1 = [12,68,124];
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const a = dark ? [26,26,25] : c0, b = dark ? [133,183,235] : c1;
+  const a = dark ? [26,26,25] : [252,252,251];
+  const b = dark ? [133,183,235] : [12,68,124];
   return `rgb(${a.map((x,i)=>Math.round(x+(b[i]-x)*t)).join(',')})`;
 }
 function div(v, m){
   const t = Math.max(-1, Math.min(1, v / m));
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   const mid = dark ? [38,38,37] : [240,239,236];
-  const pos = [227,73,72], neg = [42,120,214];
-  const c = t >= 0 ? pos : neg, u = Math.abs(t);
+  const c = t >= 0 ? [227,73,72] : [42,120,214], u = Math.abs(t);
   return `rgb(${mid.map((x,i)=>Math.round(x+(c[i]-x)*u)).join(',')})`;
 }
 const TOPIC_COLORS = {};
 (function(){
   const ramp = ["#2a78d6","#1baf7a","#eda100","#4a3aa7","#e34948","#e87ba4",
                 "#eb6834","#008300","#52514e","#85b7eb","#5dcaa5","#f0997b",
-                "#d4537e","#b4b2a9","#378add","#97c459"];
-  Array.from(new Set(D.topics)).forEach((t,i)=>TOPIC_COLORS[t]=ramp[i%ramp.length]);
+                "#d4537e","#b4b2a9","#378add","#97c459","#993c1d"];
+  Array.from(new Set(D.topics.concat(D.human.topics)))
+    .forEach((t,i)=>TOPIC_COLORS[t]=ramp[i%ramp.length]);
 })();
+function rowToDecoder(r){ return r === 0 ? "embeddings" : "decoder layer " + (r-1); }
 
 function heat(canvas, M, opts){
-  const n = M.length, m = M[0].length, band = opts.band ? 6 : 0;
+  const n = M.length, m = M[0].length, band = 6;
   canvas.width = m + band; canvas.height = n + band;
   const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   for (let i = 0; i < n; i++)
     for (let j = 0; j < m; j++){
       const v = M[i][j];
-      ctx.fillStyle = (v === null || Number.isNaN(v)) ? "#777"
-        : (opts.diverging ? div(v, opts.max) : seq(v, opts.lo, opts.hi));
+      ctx.fillStyle = fin(v) ? seq(v, opts.lo, opts.hi) : "#777";
       ctx.fillRect(j + band, i + band, 1, 1);
     }
-  if (opts.band){
-    for (let i = 0; i < n; i++){
-      ctx.fillStyle = TOPIC_COLORS[opts.rowTopics[i]] || "#777";
-      ctx.fillRect(0, i + band, band - 1, 1);
-    }
-    for (let j = 0; j < m; j++){
-      ctx.fillStyle = TOPIC_COLORS[opts.colTopics[j]] || "#777";
-      ctx.fillRect(j + band, 0, 1, band - 1);
-    }
+  for (let i = 0; i < n; i++){
+    ctx.fillStyle = TOPIC_COLORS[opts.rowTopics[i]] || "#777";
+    ctx.fillRect(0, i + band, band - 1, 1);
   }
+  for (let j = 0; j < m; j++){
+    ctx.fillStyle = TOPIC_COLORS[opts.colTopics[j]] || "#777";
+    ctx.fillRect(j + band, 0, 1, band - 1);
+  }
+}
+function topicLegend(container, topics){
+  const counts = {};
+  topics.forEach(t => counts[t] = (counts[t]||0)+1);
+  container.innerHTML = "";
+  Object.keys(counts).forEach(t=>{
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="sw" style="background:${TOPIC_COLORS[t]}"></span>`
+      + `${t} (${counts[t]})`;
+    container.appendChild(s);
+  });
 }
 
 function barChart(container, values, labels, colors, opts){
@@ -212,15 +367,17 @@ function barChart(container, values, labels, colors, opts){
   const H = n * rowH + 20, x0 = opts.x0 || 120, x1 = W - 44;
   const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
     "aria-label": opts.aria || "bar chart"});
-  const vmax = opts.max || Math.max(...values, 0.001);
+  const vmax = opts.max || Math.max(...values.filter(fin), 0.001);
   values.forEach((v,i)=>{
+    if (!fin(v)) return;
     const y = i * rowH + 4;
-    if (labels){
+    if (labels && labels[i]){
       const t = el("text", {x:0, y:y+10, "font-size":"10", fill:"var(--text2)"}, svg);
       t.textContent = labels[i];
     }
-    el("rect", {x:x0, y:y, width:Math.max((x1-x0)*v/vmax,0.5), height:rowH-6,
-      rx:2, fill:colors[i] || colors[0] || "var(--violet)"}, svg);
+    const r = el("rect", {x:x0, y:y, width:Math.max((x1-x0)*v/vmax,0.5),
+      height:rowH-6, rx:2, fill:colors[i] || "var(--violet)"}, svg);
+    if (opts.tips && opts.tips[i]) tip(r, opts.tips[i]);
     const vt = el("text", {x:x1+4, y:y+10, "font-size":"10",
       fill:"var(--muted)"}, svg);
     vt.textContent = (v*100).toFixed(0) + "%";
@@ -238,7 +395,7 @@ function lineChart(container, series, opts){
   const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
     "aria-label": opts.aria || "line chart"});
   const ymax = opts.ymax, ymin = opts.ymin || 0;
-  const X = i => x0 + (i - opts.xmin) / (opts.xmax - opts.xmin) * (x1 - x0);
+  const X = v => x0 + (v - opts.xmin) / (opts.xmax - opts.xmin) * (x1 - x0);
   const Y = v => y0 - (v - ymin) / (ymax - ymin) * (y0 - y1);
   for (let g = 0; g <= 4; g++){
     const v = ymin + (ymax - ymin) * g / 4;
@@ -254,13 +411,19 @@ function lineChart(container, series, opts){
   }
   const xt = el("text", {x:(x0+x1)/2, y:H-2, "font-size":"11",
     "text-anchor":"middle", fill:"var(--text2)"}, svg);
-  xt.textContent = opts.xlabel || "layer";
+  xt.textContent = opts.xlabel || "depth row (row R = output of decoder layer R−1)";
+  if (fin(opts.marker)){
+    el("line", {x1:X(opts.marker), y1:y1, x2:X(opts.marker), y2:y0,
+      stroke:"var(--border2)", "stroke-width":2, "stroke-dasharray":"5 4"}, svg);
+  }
   series.forEach(s=>{
-    const pts = s.pts.filter(p=>Number.isFinite(p[1]));
+    const pts = s.pts.filter(p=>fin(p[1]));
     el("polyline", {points: pts.map(p=>`${X(p[0])},${Y(p[1])}`).join(" "),
       fill:"none", stroke:s.color, "stroke-width":2}, svg);
-    pts.forEach(p=> el("circle", {cx:X(p[0]), cy:Y(p[1]), r:2.5,
-      fill:s.color}, svg));
+    pts.forEach(p=>{
+      const c = el("circle", {cx:X(p[0]), cy:Y(p[1]), r:2.5, fill:s.color}, svg);
+      if (s.tipfmt) tip(c, s.tipfmt(p));
+    });
   });
   container.appendChild(svg);
 }
@@ -275,84 +438,121 @@ Object.keys(panes).forEach(id=>{
   };
 });
 
-document.getElementById("a_pc1").textContent =
-  Math.round(D.pc19[0]*100) + "%";
+document.getElementById("a_pc1").textContent = Math.round(D.pc19[0]*100) + "%";
 document.getElementById("a_hpc1").textContent =
   Math.round(D.human.pc_shares[0]*100) + "%";
-const ls19 = D.layer_stats.find(s=>s.layer===20) || D.layer_stats[10];
-document.getElementById("a_wb").textContent =
-  ls19.within_cos.toFixed(2) + " vs " + ls19.between_cos.toFixed(2);
 
 heat(document.getElementById("heatModel"), D.cos19,
-  {lo:0, hi:1, band:true, rowTopics:D.topics, colTopics:D.topics});
+  {lo:0, hi:1, rowTopics:D.topics, colTopics:D.topics});
 heat(document.getElementById("heatHuman"), D.human.corr,
-  {lo:0, hi:1, band:true, rowTopics:D.human.topics, colTopics:D.human.topics});
+  {lo:0, hi:1, rowTopics:D.human.topics, colTopics:D.human.topics});
+topicLegend(document.getElementById("topicLegendModel"), D.topics);
+topicLegend(document.getElementById("topicLegendHuman"), D.human.topics);
 
 barChart(document.getElementById("screeModel"),
   D.pc19, D.pc19.map((_,i)=>"PC"+(i+1)),
   D.pc19.map((_,i)=> i===0 ? "var(--red)" : "var(--gray)"),
-  {title:"model: variance share of direction field, layer 19", x0:40, max:1});
+  {title:"model: variance share of the direction field, row 20", x0:40, max:1});
 barChart(document.getElementById("screeHuman"),
   D.human.pc_shares, D.human.pc_shares.map((_,i)=>"PC"+(i+1)),
   D.human.pc_shares.map((_,i)=> i===0 ? "var(--red)" : "var(--gray)"),
   {title:"humans: eigenvalue share of attitude correlations", x0:40, max:1});
 
-function renderDimByLayer(){
-  const pts1 = D.layer_stats.map(s=>[s.layer, s.pc_shares[0]]);
-  const ptsW = D.layer_stats.map(s=>[s.layer, s.within_cos]);
-  const ptsB = D.layer_stats.map(s=>[s.layer, s.between_cos]);
-  lineChart(document.getElementById("dimByLayer"),
-    [{pts:pts1, color:"var(--red)"},
-     {pts:ptsW, color:"var(--teal)"},
-     {pts:ptsB, color:"var(--gray)"}],
-    {xmin:0, xmax:36, ymax:1, aria:"PC1 share and topic cosines by layer"});
+function updateACards(row){
+  const s = D.layer_stats.find(x=>x.layer===row);
+  document.getElementById("a_wb_layer").textContent = `(row ${row})`;
+  document.getElementById("a_wb").textContent =
+    (s && fin(s.within_cos) && fin(s.between_cos))
+      ? s.within_cos.toFixed(2) + " vs " + s.between_cos.toFixed(2) : "–";
+  document.getElementById("a_pc1").textContent =
+    (s && s.pc_shares && fin(s.pc_shares[0]))
+      ? Math.round(s.pc_shares[0]*100) + "%" : "–";
 }
-renderDimByLayer();
+function renderDimByLayer(marker){
+  lineChart(document.getElementById("dimByLayer"),
+    [{pts: D.layer_stats.map(s=>[s.layer, s.pc_shares ? s.pc_shares[0] : null]),
+      color:"var(--red)", tipfmt:p=>`row ${p[0]}: PC1 ${(p[1]*100).toFixed(0)}%`},
+     {pts: D.layer_stats.map(s=>[s.layer, s.within_cos]), color:"var(--teal)",
+      tipfmt:p=>`row ${p[0]}: within-topic cos ${p[1].toFixed(2)}`},
+     {pts: D.layer_stats.map(s=>[s.layer, s.between_cos]), color:"var(--gray)",
+      tipfmt:p=>`row ${p[0]}: between-topic cos ${p[1].toFixed(2)}`}],
+    {xmin:0, xmax:36, ymax:1, marker:marker,
+     aria:"one-axis share and topic cosines by depth"});
+}
+updateACards(20);
+renderDimByLayer(20);
 document.getElementById("layerA").oninput = e=>{
-  document.getElementById("layerAv").textContent = e.target.value;
-  const s = D.layer_stats.find(x=>x.layer===+e.target.value);
-  if (s) document.getElementById("a_wb").textContent =
-    (s.within_cos||0).toFixed(2) + " vs " + (s.between_cos||0).toFixed(2);
+  const row = +e.target.value;
+  document.getElementById("layerAv").textContent = row;
+  document.getElementById("layerAd").textContent = "(" + rowToDecoder(row) + ")";
+  updateACards(row);
+  renderDimByLayer(row);
 };
 
-const med = a => { const b=[...a].sort((x,y)=>x-y); return b[b.length>>1]; };
+const med = a => { const b = a.filter(fin).sort((x,y)=>x-y);
+  return b[b.length>>1]; };
 document.getElementById("b_ansf").textContent =
   (med(D.ans_frac)*100).toFixed(1) + "%";
 document.getElementById("b_iansf").textContent =
   (med(D.ind_ans_frac)*100).toFixed(1) + "%";
 
-function renderTransfer(c){
+function renderTransfer(key){
   const wrap = document.getElementById("transferWrap");
-  if (!D.steering || c === null){
-    wrap.innerHTML = "<p class='note'>Steering grid not yet computed — re-run "
-      + "vector_analysis.py after vector_steering.py finishes.</p>";
-    document.getElementById("b_transfer").textContent = "pending";
+  wrap.innerHTML = "";
+  if (!D.steering || !key){
+    wrap.innerHTML = "<p class='note'>Steering grid not available.</p>";
+    document.getElementById("b_transfer").textContent = "–";
     return;
   }
-  const T = D.steering, tr = T.transfer[c];
+  const T = D.steering, tr = T.transfer[key];
   const dirNames = Object.keys(tr);
-  const M = dirNames.map(d=>tr[d]);
-  const mx = Math.max(...M.flat().filter(v=>v!==null).map(Math.abs), 0.01);
-  const cv = document.getElementById("heatTransfer");
-  heat(cv, M, {diverging:true, max:mx});
-  cv.style.maxWidth = "560px";
-  document.getElementById("transferCap").textContent =
-    `Rows: steering direction (top = global, then ${dirNames.length-1} topics). `
-    + `Columns: ${T.topics.length} item topics: ${T.topics.join(", ")}. `
-    + `Color: oriented shift toward conservative (max |${mx.toFixed(2)}| scale units), ${c}.`;
-  const diag = [], off = [];
+  const vals = dirNames.flatMap(d=>tr[d]).filter(fin);
+  const mx = Math.max(...vals.map(Math.abs), 0.01);
+  const cell = 26, x0 = 150, y0 = 84;
+  const W = x0 + T.topics.length*cell + 20, H = y0 + dirNames.length*cell + 8;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"steering transfer matrix: rows are steering directions, "
+      + "columns are item topics"});
+  svg.style.maxWidth = "760px";
+  T.topics.forEach((t,j)=>{
+    const x = x0 + j*cell + cell/2;
+    const tx = el("text", {x:x, y:y0-8, "font-size":"10", fill:"var(--text2)",
+      transform:`rotate(-45 ${x} ${y0-8})`}, svg);
+    tx.textContent = t;
+  });
   dirNames.forEach((d,i)=>{
+    const y = y0 + i*cell;
+    const label = d === "global" ? "global (all items)" : d.slice(6);
+    const tx = el("text", {x:x0-8, y:y+cell/2+4, "font-size":"11",
+      "text-anchor":"end",
+      fill: d === "global" ? "var(--text)" : "var(--text2)"}, svg);
+    tx.textContent = "steer: " + label;
+    tr[d].forEach((v,j)=>{
+      const r = el("rect", {x:x0+j*cell+1, y:y+1, width:cell-2, height:cell-2,
+        rx:3, fill: fin(v) ? div(v, mx) : "var(--card)"}, svg);
+      tip(r, `steer ${label} → ${T.topics[j]} items: `
+        + (fin(v) ? (v>0?"+":"") + v.toFixed(2) + " toward conservative"
+                  : "no items"));
+    });
+  });
+  wrap.appendChild(svg);
+  const cap = document.createElement("p");
+  cap.className = "note";
+  cap.textContent = `Color scale: ±${mx.toFixed(2)} scale units, ${key}. `
+    + `Rows without ≥3 items in a topic have no steering direction.`;
+  wrap.appendChild(cap);
+  const diag = [], off = [];
+  dirNames.forEach(d=>{
     if (!d.startsWith("topic:")) return;
     const t = d.slice(6);
     tr[d].forEach((v,j)=>{
-      if (v===null) return;
+      if (!fin(v)) return;
       (T.topics[j]===t ? diag : off).push(v);
     });
   });
-  const dm = diag.reduce((a,b)=>a+b,0)/Math.max(diag.length,1);
-  const om = off.reduce((a,b)=>a+b,0)/Math.max(off.length,1);
+  const m = a => a.reduce((x,y)=>x+y,0)/Math.max(a.length,1);
   document.getElementById("b_transfer").textContent =
-    `own ${dm.toFixed(2)} vs other ${om.toFixed(2)}`;
+    `own ${m(diag).toFixed(2)} vs other ${m(off).toFixed(2)}`;
 }
 (function(){
   const cs = D.steering ? Object.keys(D.steering.transfer) : [];
@@ -371,18 +571,15 @@ function renderTransfer(c){
 })();
 
 (function(){
-  const idx = D.items.map((_,i)=>i);
-  const vals = [];
-  const colors = [];
-  const labels = [];
-  idx.forEach(i=>{
+  const vals = [], colors = [], labels = [], tips = [];
+  D.items.forEach((it,i)=>{
     vals.push(D.ans_frac[i]); colors.push("var(--red)");
-    labels.push(D.items[i]);
+    labels.push(it); tips.push(`${it} (${D.topics[i]}): ${D.labels[it]}`);
     vals.push(D.ind_ans_frac[i]); colors.push("var(--violet)");
-    labels.push("");
+    labels.push(""); tips.push(`${it} independent offset`);
   });
   barChart(document.getElementById("ansFracChart"), vals, labels, colors,
-    {w:900, rowH:11, x0:100, max:Math.max(...vals),
+    {w:900, rowH:11, x0:100, max:Math.max(...vals.filter(fin)), tips:tips,
      aria:"answer-relevant fractions per item"});
 })();
 
@@ -395,41 +592,49 @@ const PCOLORS = ["var(--blue)","var(--red)","var(--violet)","var(--amber)"];
     lg.appendChild(s);
   });
 })();
-function renderMap(L){
-  const m = D.persona_maps[String(L)];
+function renderMap(row){
+  const m = D.persona_maps[String(row)];
   const cont = document.getElementById("personaMap");
   cont.innerHTML = "";
   if (!m) return;
   const W = 900, H = 380, cx = W/2, cy = H/2, s = Math.min(W,H)/2 - 20;
   const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
-    "aria-label":"persona map at layer " + L});
+    "aria-label":"persona map at depth row " + row});
   el("line", {x1:cx-s, y1:cy, x2:cx+s, y2:cy, stroke:"var(--border)"}, svg);
   el("line", {x1:cx, y1:cy-s, x2:cx, y2:cy+s, stroke:"var(--border)"}, svg);
   m.x.forEach((x,i)=>{
-    el("circle", {cx:cx+x*s, cy:cy-m.y[i]*s, r:4,
+    const c = el("circle", {cx:cx+x*s, cy:cy-m.y[i]*s, r:4,
       fill:PCOLORS[m.p[i]], opacity:0.65}, svg);
+    tip(c, D.personas[m.p[i]]);
   });
   cont.appendChild(svg);
 }
 renderMap(20);
 document.getElementById("layerC").oninput = e=>{
-  document.getElementById("layerCv").textContent = e.target.value;
-  renderMap(+e.target.value);
+  const row = +e.target.value;
+  document.getElementById("layerCv").textContent = row;
+  document.getElementById("layerCd").textContent = "(" + rowToDecoder(row) + ")";
+  renderMap(row);
 };
 
 (function(){
-  const layers = D.probe_acc.map((_,i)=>i);
+  const rows = D.probe_acc.map((_,i)=>i);
+  const sepMax = Math.max(...D.separability.filter(fin), 1e-9);
   const s = [
-    {pts: layers.map(L=>[L, D.probe_acc[L]]), color:"var(--blue)"},
-    {pts: layers.map(L=>[L, D.separability[L] /
-        Math.max(...D.separability.filter(Number.isFinite))]),
-     color:"var(--teal)"},
-    {pts: layers.map(L=>[L, D.ind_offaxis[L]]), color:"var(--violet)"},
+    {pts: rows.map(R=>[R, D.probe_acc[R]]), color:"var(--blue)",
+     tipfmt:p=>`row ${p[0]}: probe ${(p[1]*100).toFixed(0)}%`},
+    {pts: rows.map(R=>[R, fin(D.separability[R])
+        ? D.separability[R]/sepMax : null]), color:"var(--teal)",
+     tipfmt:p=>`row ${p[0]}: separability ${(p[1]*100).toFixed(0)}% of max`},
+    {pts: rows.map(R=>[R, D.ind_offaxis[R]]), color:"var(--violet)",
+     tipfmt:p=>`row ${p[0]}: off-axis ${(p[1]*100).toFixed(0)}%`},
   ];
   if (D.steering && D.steering.layer_sweep.length){
     const mx = Math.max(...D.steering.layer_sweep.map(p=>Math.abs(p.shift)), 0.01);
     s.push({pts: D.steering.layer_sweep.map(p=>[p.layer+1, p.shift/mx]),
-            color:"var(--amber)"});
+      color:"var(--amber)",
+      tipfmt:p=>`row ${p[0]} (decoder layer ${p[0]-1}): `
+        + `shift ${(p[1]*mx).toFixed(2)} scale units`});
   }
   lineChart(document.getElementById("depthCurves"), s,
     {xmin:0, xmax:36, ymax:1.02, ymin:0, h:260,
