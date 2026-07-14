@@ -629,8 +629,11 @@ function renderTransfer(key){
   }
   const T = D.steering, tr = T.transfer[key];
   const dirNames = Object.keys(tr);
-  const vals = dirNames.flatMap(d=>tr[d]).filter(fin);
-  const mx = Math.max(...vals.map(Math.abs), 0.01);
+  // fixed absolute color range across ALL strength/layer views, so weak
+  // matrices (e.g. L19) render pale instead of auto-saturating
+  const mx = window.__transferMax || (window.__transferMax = Math.max(0.01,
+    ...Object.values(T.transfer).flatMap(m =>
+      Object.values(m).flat().filter(fin).map(Math.abs))));
   const cell = 26, x0 = 150, y0 = 84;
   const W = x0 + T.topics.length*cell + 20, H = y0 + dirNames.length*cell + 8;
   const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
@@ -671,11 +674,14 @@ function renderTransfer(key){
   wrap.appendChild(cb);
   colorbar(cb, {type:"div", max:mx,
     label:`answer shift in scale units (1 = full sweep of the answer scale); `
-      + `red = toward conservative pole, blue = toward liberal — ${key}`});
+      + `red = toward conservative pole, blue = toward liberal`});
   const cap = document.createElement("p");
   cap.className = "note";
-  cap.textContent = `Cell numbers are the same shifts printed directly. `
-    + `Topics without ≥3 items have no steering direction (no row).`;
+  cap.textContent = `Color range is FIXED at ±${mx.toFixed(2)} across every `
+    + `strength/layer view, so matrices are directly comparable — near-white `
+    + `(e.g. most of L19) means the shifts really are tiny. Cell numbers are `
+    + `the shifts printed directly. Topics without ≥3 items have no steering `
+    + `direction (no row). Currently showing ${key}.`;
   wrap.appendChild(cap);
   const diag = [], off = [];
   dirNames.forEach(d=>{
