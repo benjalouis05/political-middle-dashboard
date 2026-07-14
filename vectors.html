@@ -246,14 +246,16 @@ keyhole, and nearly all persona structure lives outside it.</p>
 </div>
 
 <h2 style="margin-top:2.5rem">Try it: steer one question yourself</h2>
-<p class="sub">Pick a question, then drag the slider to push the model's internal
-state along its global partisan axis — right (positive) pushes toward
-conservative, left (negative) pushes toward liberal. The purple bars are the
-steered answer distribution; blue and red outlines are what the unsteered liberal
-and conservative personas actually answer, so you can see whether steering
-reproduces the real persona or does something stranger. Switch between decoder
-layers 19 and 29 to feel the main finding: the same push does almost nothing
-mid-network and works late.</p>
+<p class="sub">Pick a question and a starting persona, then drag the slider to
+push the model's internal state along its global partisan axis — right (positive)
+pushes toward conservative, left (negative) pushes toward liberal. Starting from
+the <b>liberal</b> persona, positive c asks "can we turn a liberal into a
+conservative?"; starting from the <b>conservative</b> persona, negative c asks the
+reverse. The purple bars are the steered answer distribution; blue and red
+outlines are what the unsteered liberal and conservative personas actually answer,
+so you can see whether steering reproduces the real opposite persona or overshoots
+into caricature. Switch between decoder layers 19 and 29 to feel the main finding:
+the same push does almost nothing mid-network and works late.</p>
 <details>
 <summary>What exactly happens when you move the slider</summary>
 <p>The model reads the prompt "<em>A randomly selected politically liberal US
@@ -274,6 +276,8 @@ not a simulation of a conservative.</p>
 </details>
 <div class="controls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px">
 <select id="exItem" style="font-size:13px;max-width:300px"></select>
+<span style="font-size:13px;color:var(--muted)">start as</span>
+<span id="exSrcBtns" style="display:flex;gap:6px"></span>
 <span id="exLayerBtns" style="display:flex;gap:6px"></span>
 </div>
 <div class="sliderrow"><span style="color:var(--blue)">← toward liberal</span>
@@ -798,6 +802,19 @@ document.getElementById("layerC").oninput = e=>{
       b.className = "on"; renderEx(); };
     lb.appendChild(b);
   });
+  const SOURCES = E.sources || ["liberal"];
+  let exSrc = "liberal";
+  const sb = document.getElementById("exSrcBtns");
+  SOURCES.forEach(s=>{
+    const b = document.createElement("button");
+    b.textContent = s;
+    b.style.color = s === "liberal" ? "var(--blue)" : "var(--red)";
+    b.className = s===exSrc ? "on" : "";
+    b.onclick = ()=>{ exSrc = s;
+      Array.from(sb.children).forEach(x=>x.className="");
+      b.className = "on"; renderEx(); };
+    sb.appendChild(b);
+  });
   const slider = document.getElementById("exC");
   slider.min = 0; slider.max = CS.length-1; slider.step = 1;
   slider.value = CS.indexOf(0);
@@ -807,7 +824,8 @@ document.getElementById("layerC").oninput = e=>{
     const it = sel.value, rec = E.items[it];
     const c = CS[+slider.value];
     document.getElementById("exCv").textContent = "c = " + c;
-    const steered = rec.steered[exLayer][`${c}`] || rec.steered[exLayer]["0"];
+    const bySrc = rec.steered[exSrc] || rec.steered[Object.keys(rec.steered)[0]];
+    const steered = bySrc[exLayer][`${c}`] || bySrc[exLayer]["0"];
     const lib = rec.personas.liberal, con = rec.personas.conservative;
     const k = rec.options.length;
     const W = 900, H = 240, x0 = 30, x1 = W-10, y0 = H-40, top = 12;
@@ -856,7 +874,8 @@ document.getElementById("layerC").oninput = e=>{
       tip(cm, `${label}: mean position ${p.toFixed(2)} (A=0 … `
         + `${String.fromCharCode(64+k)}=1)`);
     };
-    const mp = {lib: meanPos(lib), con: meanPos(con), st: meanPos(steered)};
+    const mp = {lib: meanPos(lib), con: meanPos(con), st: meanPos(steered),
+                base: meanPos(rec.personas[exSrc])};
     mark(mp.lib, "var(--blue)", "unsteered liberal");
     mark(mp.con, "var(--red)", "unsteered conservative");
     mark(mp.st, "var(--violet)", "steered", 7.5);
@@ -865,15 +884,17 @@ document.getElementById("layerC").oninput = e=>{
     document.getElementById("exOptions").innerHTML =
       rec.options.map((o,i)=>`<b>${String.fromCharCode(65+i)}.</b> ${o}`)
         .join(" &nbsp;·&nbsp; ");
-    const towardCon = (mp.con >= mp.lib) === (mp.st >= mp.lib);
-    const moved = Math.abs(mp.st - mp.lib);
+    // item polarity: +1 if higher position = conservative on this item's scale
+    const pol = mp.con >= mp.lib ? 1 : -1;
+    const movement = (mp.st - mp.base) * pol;   // + = toward conservative
+    const moved = Math.abs(mp.st - mp.base);
     document.getElementById("exSummary").textContent =
       c === 0
-        ? "c = 0: this is the unsteered liberal persona's answer."
-        : `At c = ${c} (decoder layer ${exLayer}) the mean answer moved `
-          + `${moved.toFixed(2)} scale units from the liberal baseline`
+        ? `c = 0: this is the unsteered ${exSrc} persona's answer.`
+        : `Starting as ${exSrc}, at c = ${c} (decoder layer ${exLayer}) the mean `
+          + `answer moved ${moved.toFixed(2)} scale units`
           + (moved < 0.02 ? " — essentially nothing"
-             : towardCon === (c > 0)
+             : (movement > 0) === (c > 0)
                ? ", in the direction the sign predicts"
                : ", in the OPPOSITE direction to the push — item-level noise")
           + `. Liberal persona sits at ${mp.lib.toFixed(2)}, conservative at `
