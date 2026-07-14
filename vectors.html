@@ -124,12 +124,17 @@ dimension, the right one would be too. The left matrix <em>is</em> nearly unifor
 the right one has a bright diagonal and visible topic blocks.</p>
 <div class="row2">
 <div><canvas id="heatModel" class="heat"></canvas>
+<div id="cbarModel"></div>
+<p class="note" id="hoverModel">Hover the matrix for exact values.</p>
 <p class="note">Model: item-direction cosines (58 × 58), row 20. Uniformly light
 blue ≈ every issue shares one internal direction.</p>
 <div class="legend" id="topicLegendModel"></div></div>
 <div><canvas id="heatHuman" class="heat"></canvas>
+<div id="cbarHuman"></div>
+<p class="note" id="hoverHuman">Hover the matrix for exact values.</p>
 <p class="note">Humans: inter-item response correlations, GSS 2014–2024 (14 × 14;
-cells with fewer than 200 co-respondents shown as 0). Blocks = domain structure.</p>
+cells with fewer than 200 co-respondents shown as 0; negative correlations also
+render as 0 on this color scale). Blocks = domain structure.</p>
 <div class="legend" id="topicLegendHuman"></div></div>
 </div>
 <details>
@@ -199,13 +204,21 @@ the conservative pattern, the direction causally controls the answer; the streng
 <code>c</code> scales the push. Directions are built per topic (the average of
 that topic's item directions — only topics with ≥3 items get one) plus one
 <b>global</b> direction (average over all 58 items).</p>
-<p>Each matrix cell below = steer with the <b>row's</b> direction, measure the
-average answer shift on the <b>column's</b> items, oriented so red = toward the
-conservative pole of that item (blue = toward liberal). "Oriented" uses each
-item's own polarity: the sign of the model's unsteered conservative−liberal gap
-on that item. The buttons switch strength (c) and depth (L = decoder layer). Two
-depths matter: L19 (mid-network, where the representation is strong) and L29
-(late, where — as tab C shows — steering actually works).</p>
+<p><b>What c means.</b> The strength c is measured in units of the model's own
+persona gap: the direction is the average internal difference between the
+conservative and liberal personas, so <code>c = 1</code> would add exactly one
+natural liberal→conservative gap to the model's state. <code>c = 2</code> pushes
+twice as far as the personas actually differ, <code>c = 8</code> eight times as
+far — an exaggerated shove used to find where intervention works at all.</p>
+<p><b>What the cells mean.</b> Each cell = steer with the <b>row's</b> direction,
+measure the average answer shift on the <b>column's</b> items, in <b>scale
+units</b>: 0 = no movement, 1 = a full sweep from one end of the answer scale to
+the other (so +0.33 means answers moved a third of the scale toward that item's
+conservative pole; blue/negative = toward the liberal pole). "Toward conservative"
+uses each item's own polarity: the sign of the model's unsteered
+conservative−liberal gap on that item. The buttons switch strength (c) and depth
+(L = decoder layer). Two depths matter: L19 (mid-network, where the representation
+is strong) and L29 (late, where — as tab C shows — steering actually works).</p>
 <p><b>The dimensionality reading:</b> if the model kept separate per-topic
 knowledge, the matrix would have a dark diagonal (each topic direction moves only
 its own topic). Instead, at L29 every row moves every column: one shared causal
@@ -248,7 +261,9 @@ adult would answer (give the single letter):</em>" for your chosen question. At
 the chosen decoder layer, we add <code>c × g</code> to the layer's output, where
 <code>g</code> is the <b>global partisan axis</b> — the average, over all 58
 items, of (conservative activation − liberal activation) — and <code>c</code> is
-the slider value. Everything else runs normally, and the bars show the resulting
+the slider value, in units of that natural gap: <code>c = 1</code> ≈ one model's-own
+liberal↔conservative difference, <code>c = 8</code> = eight times farther than the
+personas actually sit apart. Everything else runs normally, and the bars show the resulting
 probabilities over the option letters (computed offline for c ∈ {−8…+8}; the
 slider snaps to the precomputed grid). Because <code>g</code> is one shared axis
 built from <em>all</em> topics, the fact that it moves answers on <em>any single</em>
@@ -331,7 +346,11 @@ quantities). Answer-relevant fraction: norm share inside the centered span of th
 option-letter unembeddings. Steering: add c·direction to one decoder layer's output
 at every position during a single forward pass, liberal source persona; shifts are
 oriented per item by the sign of the model's own conservative−liberal behavioral
-gap (items with near-zero gaps contribute noise). Battery: 60 GSS-style items
+gap (items with near-zero gaps contribute noise). Units: answer positions and
+shifts are in <b>scale units</b> — 0 is the first option of an item's scale, 1 the
+last, so a shift of 0.33 moves the expected answer a third of the way across the
+scale; steering strength c is in units of the model's average internal
+liberal→conservative persona gap. Battery: 60 GSS-style items
 (2 meta items excluded), 17 topics; topic steering directions exist only for topics
 with ≥3 items. Code: <code>mech_interp_scripts/m_track/vector_*.py</code> and
 <code>battery60.py</code>; raw artifacts in
@@ -492,6 +511,63 @@ heat(document.getElementById("heatHuman"), D.human.corr,
 topicLegend(document.getElementById("topicLegendModel"), D.topics);
 topicLegend(document.getElementById("topicLegendHuman"), D.human.topics);
 
+function colorbar(container, opts){
+  container.innerHTML = "";
+  const W = 440, H = 38, x0 = 8, x1 = W-8, bh = 10, steps = 64;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label": opts.label});
+  for (let s = 0; s < steps; s++){
+    const t = s/(steps-1);
+    const v = opts.type === "div" ? (t*2-1)*opts.max
+                                  : opts.lo + (opts.hi-opts.lo)*t;
+    el("rect", {x:x0+(x1-x0)*s/steps, y:2, width:(x1-x0)/steps+0.6, height:bh,
+      fill: opts.type === "div" ? div(v, opts.max) : seq(v, opts.lo, opts.hi)},
+      svg);
+  }
+  const ticks = opts.type === "div"
+    ? [-opts.max, -opts.max/2, 0, opts.max/2, opts.max]
+    : [0, 0.25, 0.5, 0.75, 1].map(t=>opts.lo+(opts.hi-opts.lo)*t);
+  ticks.forEach(v=>{
+    const t = opts.type === "div" ? (v/opts.max+1)/2
+                                  : (v-opts.lo)/(opts.hi-opts.lo);
+    const x = x0+(x1-x0)*t;
+    el("line", {x1:x, y1:2, x2:x, y2:bh+4, stroke:"var(--muted)"}, svg);
+    const tx = el("text", {x:x, y:bh+14, "font-size":"9",
+      "text-anchor":"middle", fill:"var(--muted)"}, svg);
+    tx.textContent = (opts.fmt || (n=>n.toFixed(2)))(v);
+  });
+  const lb = el("text", {x:x0, y:H-2, "font-size":"10",
+    fill:"var(--text2)"}, svg);
+  lb.textContent = opts.label;
+  container.appendChild(svg);
+}
+colorbar(document.getElementById("cbarModel"),
+  {type:"seq", lo:0, hi:1,
+   label:"cosine similarity: 0 = unrelated internal directions, 1 = identical direction"});
+colorbar(document.getElementById("cbarHuman"),
+  {type:"seq", lo:0, hi:1,
+   label:"correlation between respondents' answers: 0 = unrelated, 1 = in lockstep"});
+
+function attachHover(canvas, M, items, topics, outEl, unit){
+  const band = 6, n = M.length, m = M[0].length;
+  const idle = "Hover the matrix for exact values.";
+  canvas.style.cursor = "crosshair";
+  canvas.addEventListener("mousemove", e=>{
+    const r = canvas.getBoundingClientRect();
+    const j = Math.floor((e.clientX-r.left)/r.width*(m+band)) - band;
+    const i = Math.floor((e.clientY-r.top)/r.height*(n+band)) - band;
+    if (i < 0 || j < 0 || i >= n || j >= m){ outEl.textContent = idle; return; }
+    const v = M[i][j];
+    outEl.textContent = `${items[i]} (${topics[i]}) × ${items[j]} `
+      + `(${topics[j]}) — ${unit} = ${fin(v) ? v.toFixed(2) : "n/a"}`;
+  });
+  canvas.addEventListener("mouseleave", ()=>{ outEl.textContent = idle; });
+}
+attachHover(document.getElementById("heatModel"), D.cos19, D.items, D.topics,
+  document.getElementById("hoverModel"), "cosine");
+attachHover(document.getElementById("heatHuman"), D.human.corr, D.human.items,
+  D.human.topics, document.getElementById("hoverHuman"), "correlation");
+
 barChart(document.getElementById("screeModel"),
   D.pc19, D.pc19.map((_,i)=>"PC"+(i+1)),
   D.pc19.map((_,i)=> i===0 ? "var(--red)" : "var(--gray)"),
@@ -574,15 +650,28 @@ function renderTransfer(key){
       const r = el("rect", {x:x0+j*cell+1, y:y+1, width:cell-2, height:cell-2,
         rx:3, fill: fin(v) ? div(v, mx) : "var(--card)"}, svg);
       tip(r, `steer ${label} → ${T.topics[j]} items: `
-        + (fin(v) ? (v>0?"+":"") + v.toFixed(2) + " toward conservative"
+        + (fin(v) ? (v>0?"+":"") + v.toFixed(2) + " scale units toward conservative"
                   : "no items"));
+      if (fin(v)){
+        const u = Math.abs(v)/mx;
+        const vt = el("text", {x:x0+j*cell+cell/2, y:y+cell/2+3,
+          "font-size":"7.5", "text-anchor":"middle",
+          fill: u > 0.55 ? "#fff" : "var(--text2)"}, svg);
+        vt.textContent = (v < 0 ? "−" : "") +
+          Math.abs(v).toFixed(2).replace(/^0\./, ".");
+      }
     });
   });
   wrap.appendChild(svg);
+  const cb = document.createElement("div");
+  wrap.appendChild(cb);
+  colorbar(cb, {type:"div", max:mx,
+    label:`answer shift in scale units (1 = full sweep of the answer scale); `
+      + `red = toward conservative pole, blue = toward liberal — ${key}`});
   const cap = document.createElement("p");
   cap.className = "note";
-  cap.textContent = `Color scale: ±${mx.toFixed(2)} scale units, ${key}. `
-    + `Rows without ≥3 items in a topic have no steering direction.`;
+  cap.textContent = `Cell numbers are the same shifts printed directly. `
+    + `Topics without ≥3 items have no steering direction (no row).`;
   wrap.appendChild(cap);
   const diag = [], off = [];
   dirNames.forEach(d=>{
