@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside the model: the geometry of political knowledge</title>
+<style>
+:root {
+  --bg: #fcfcfb; --card: #f4f3f0; --text: #1a1a19; --text2: #52514e;
+  --muted: #898781; --border: #e1e0d9; --border2: #c3c2b7;
+  --blue: #2a78d6; --red: #e34948; --violet: #4a3aa7; --amber: #eda100;
+  --gray: #898781; --teal: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a19; --card: #262625; --text: #f2f1ec; --text2: #c3c2b7;
+          --muted: #898781; --border: #2c2c2a; --border2: #383835;
+          --violet: #9085e9; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; }
+h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
+p.sub { color: var(--text2); font-size: 14px; margin: 0 0 14px; }
+p.note { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+a { color: var(--text2); }
+button { font: inherit; font-size: 13px; color: var(--text);
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+button:hover { background: var(--card); }
+button.on { border-color: var(--text); }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 1.5rem 0 0; }
+.tabs button { padding: 8px 16px; font-size: 14px; }
+section { margin-top: 2rem; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; margin: 0 0 14px; }
+.card { background: var(--card); border-radius: 10px; padding: 0.9rem 1rem; }
+.card .k { font-size: 12px; color: var(--muted); }
+.card .v { font-size: 24px; font-weight: 500; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 760px) { .row2 { grid-template-columns: 1fr; } }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px;
+  color: var(--text2); margin: 4px 0 0; }
+.legend span { display: flex; align-items: center; gap: 5px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+canvas.heat { width: 100%; image-rendering: pixelated; border: 1px solid var(--border); }
+svg { display: block; width: 100%; }
+input[type=range] { width: 240px; }
+.sliderrow { display: flex; align-items: center; gap: 12px; margin: 8px 0;
+  font-size: 13px; color: var(--text2); }
+footer { margin-top: 4rem; border-top: 1px solid var(--border);
+  padding-top: 1.25rem; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Inside the model: the geometry of political knowledge</h1>
+<p class="sub">Qwen2.5-3B-Instruct, 58 GSS-style attitude items, residual-stream
+activations at every layer. Companion to
+<a href="index.html">the behavioral dashboard</a>: is politics one direction
+inside the model, or many? And which of those directions actually control
+answers?</p>
+
+<div class="tabs">
+<button id="tabA" class="on">A · How many dimensions?</button>
+<button id="tabB">B · Decodable vs causal</button>
+<button id="tabC">C · Where it lives</button>
+</div>
+
+<section id="paneA">
+<div class="cards">
+<div class="card"><div class="k">model: share of direction field on one axis</div><div class="v" id="a_pc1">–</div></div>
+<div class="card"><div class="k">humans: share of attitude structure on one axis</div><div class="v" id="a_hpc1">–</div></div>
+<div class="card"><div class="k">within-topic vs between-topic cosine</div><div class="v" id="a_wb">–</div></div>
+</div>
+<p class="sub">Each of the 58 items gets a partisan direction: conservative
+activation minus liberal activation at layer 19. Left: cosine similarity between
+every pair of item directions, ordered by topic (topic bands on the axes). Right:
+the human benchmark — correlations between real respondents' answers on the GSS
+items, same ordering logic. If politics were one internal axis, the left matrix
+would be uniformly dark; if human attitudes were one dimension, so would the right.</p>
+<div class="row2">
+<div><canvas id="heatModel" class="heat"></canvas>
+<p class="note" id="heatModelCap">Model: item-direction cosines, layer 19.</p></div>
+<div><canvas id="heatHuman" class="heat"></canvas>
+<p class="note">Humans: inter-item response correlations (GSS 2014–2024,
+14 mapped items).</p></div>
+</div>
+<div class="row2" style="margin-top:20px">
+<div id="screeModel"></div>
+<div id="screeHuman"></div>
+</div>
+<div class="sliderrow"><span>layer</span>
+<input type="range" id="layerA" min="0" max="36" step="2" value="19">
+<span id="layerAv">19</span>
+<span style="color:var(--muted)">PC1 share and topic structure by depth below</span></div>
+<div id="dimByLayer"></div>
+</section>
+
+<section id="paneB" style="display:none">
+<div class="cards">
+<div class="card"><div class="k">partisan direction: answer-relevant fraction (median)</div><div class="v" id="b_ansf">–</div></div>
+<div class="card"><div class="k">independent offset: answer-relevant fraction (median)</div><div class="v" id="b_iansf">–</div></div>
+<div class="card"><div class="k">cross-topic steering transfer</div><div class="v" id="b_transfer">–</div></div>
+</div>
+<p class="sub">The causal test. We steer a liberal run along one topic's partisan
+direction and measure the shift toward conservative answers on every topic's
+items. Rows are the steering direction, columns the items being tested; a dark
+diagonal with light off-diagonal would mean separate per-topic knowledge; a
+uniformly dark matrix means one shared causal axis.</p>
+<div class="sliderrow"><span>strength c</span><span id="cBtns" style="display:flex;gap:6px"></span></div>
+<div id="transferWrap"><canvas id="heatTransfer" class="heat"></canvas>
+<p class="note" id="transferCap">Steering transfer matrix (oriented shift toward
+conservative, in scale units).</p></div>
+<p class="sub" style="margin-top:20px">Per-item answer-relevant fractions at
+layer 19: how much of each direction's magnitude lies in the span of the option-letter
+unembeddings (the only part that can move a forced-choice answer).</p>
+<div id="ansFracChart"></div>
+<div class="legend">
+<span><span class="sw" style="background:var(--red)"></span>partisan direction (con − lib)</span>
+<span><span class="sw" style="background:var(--violet)"></span>independent offset (ind − lib)</span>
+</div>
+</section>
+
+<section id="paneC" style="display:none">
+<p class="sub">The persona map: activations of the four personas across all 58
+items (question identity removed), projected to 2-D, with a layer slider. Then the
+depth curves: when concepts become decodable, when personas separate, and where
+steering actually works.</p>
+<div class="sliderrow"><span>layer</span>
+<input type="range" id="layerC" min="0" max="36" step="2" value="20">
+<span id="layerCv">20</span></div>
+<div id="personaMap"></div>
+<div class="legend" id="personaLegend"></div>
+<div id="depthCurves" style="margin-top:20px"></div>
+<div class="legend">
+<span><span class="sw" style="background:var(--blue)"></span>probe accuracy (lib vs con, held-out items)</span>
+<span><span class="sw" style="background:var(--teal)"></span>persona separability</span>
+<span><span class="sw" style="background:var(--violet)"></span>independent off-axis fraction</span>
+<span><span class="sw" style="background:var(--amber)"></span>steering shift (global direction, c=4)</span>
+</div>
+</section>
+
+<footer>
+<p>All directions are residual-stream differences of persona-conditioned
+activations at the final prompt token. Answer-relevant fraction = norm fraction
+of a direction inside the centered span of the option-letter unembeddings.
+Steering = adding c·direction to the output of a decoder layer during a single
+forward pass, liberal source persona, exact option-probability readout. Human
+benchmark: weighted inter-item correlations, GSS 2014–2024. Code:
+<code>mech_interp_scripts/m_track/vector_*.py</code> in the llm-liar repo.</p>
+</footer>
+</main>
+
+<script src="vectors_data.js"></script>
+<script>
+const D = window.VEC_DATA;
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(t, a, p){ const e = document.createElementNS(SVGNS, t);
+  for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+function seq(v, lo, hi){
+  const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+  const c0 = [252,252,251], c1 = [12,68,124];
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const a = dark ? [26,26,25] : c0, b = dark ? [133,183,235] : c1;
+  return `rgb(${a.map((x,i)=>Math.round(x+(b[i]-x)*t)).join(',')})`;
+}
+function div(v, m){
+  const t = Math.max(-1, Math.min(1, v / m));
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const mid = dark ? [38,38,37] : [240,239,236];
+  const pos = [227,73,72], neg = [42,120,214];
+  const c = t >= 0 ? pos : neg, u = Math.abs(t);
+  return `rgb(${mid.map((x,i)=>Math.round(x+(c[i]-x)*u)).join(',')})`;
+}
+const TOPIC_COLORS = {};
+(function(){
+  const ramp = ["#2a78d6","#1baf7a","#eda100","#4a3aa7","#e34948","#e87ba4",
+                "#eb6834","#008300","#52514e","#85b7eb","#5dcaa5","#f0997b",
+                "#d4537e","#b4b2a9","#378add","#97c459"];
+  Array.from(new Set(D.topics)).forEach((t,i)=>TOPIC_COLORS[t]=ramp[i%ramp.length]);
+})();
+
+function heat(canvas, M, opts){
+  const n = M.length, m = M[0].length, band = opts.band ? 6 : 0;
+  canvas.width = m + band; canvas.height = n + band;
+  const ctx = canvas.getContext("2d");
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < m; j++){
+      const v = M[i][j];
+      ctx.fillStyle = (v === null || Number.isNaN(v)) ? "#777"
+        : (opts.diverging ? div(v, opts.max) : seq(v, opts.lo, opts.hi));
+      ctx.fillRect(j + band, i + band, 1, 1);
+    }
+  if (opts.band){
+    for (let i = 0; i < n; i++){
+      ctx.fillStyle = TOPIC_COLORS[opts.rowTopics[i]] || "#777";
+      ctx.fillRect(0, i + band, band - 1, 1);
+    }
+    for (let j = 0; j < m; j++){
+      ctx.fillStyle = TOPIC_COLORS[opts.colTopics[j]] || "#777";
+      ctx.fillRect(j + band, 0, 1, band - 1);
+    }
+  }
+}
+
+function barChart(container, values, labels, colors, opts){
+  container.innerHTML = "";
+  const W = opts.w || 440, n = values.length, rowH = opts.rowH || 18;
+  const H = n * rowH + 20, x0 = opts.x0 || 120, x1 = W - 44;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label": opts.aria || "bar chart"});
+  const vmax = opts.max || Math.max(...values, 0.001);
+  values.forEach((v,i)=>{
+    const y = i * rowH + 4;
+    if (labels){
+      const t = el("text", {x:0, y:y+10, "font-size":"10", fill:"var(--text2)"}, svg);
+      t.textContent = labels[i];
+    }
+    el("rect", {x:x0, y:y, width:Math.max((x1-x0)*v/vmax,0.5), height:rowH-6,
+      rx:2, fill:colors[i] || colors[0] || "var(--violet)"}, svg);
+    const vt = el("text", {x:x1+4, y:y+10, "font-size":"10",
+      fill:"var(--muted)"}, svg);
+    vt.textContent = (v*100).toFixed(0) + "%";
+  });
+  if (opts.title){
+    const t = el("text", {x:x0, y:H-2, "font-size":"11", fill:"var(--muted)"}, svg);
+    t.textContent = opts.title;
+  }
+  container.appendChild(svg);
+}
+
+function lineChart(container, series, opts){
+  container.innerHTML = "";
+  const W = 900, H = opts.h || 220, x0 = 46, x1 = W-16, y0 = H-30, y1 = 12;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label": opts.aria || "line chart"});
+  const ymax = opts.ymax, ymin = opts.ymin || 0;
+  const X = i => x0 + (i - opts.xmin) / (opts.xmax - opts.xmin) * (x1 - x0);
+  const Y = v => y0 - (v - ymin) / (ymax - ymin) * (y0 - y1);
+  for (let g = 0; g <= 4; g++){
+    const v = ymin + (ymax - ymin) * g / 4;
+    el("line", {x1:x0, y1:Y(v), x2:x1, y2:Y(v), stroke:"var(--border)"}, svg);
+    const t = el("text", {x:x0-6, y:Y(v)+4, "font-size":"10",
+      "text-anchor":"end", fill:"var(--muted)"}, svg);
+    t.textContent = v.toFixed(2);
+  }
+  for (let L = opts.xmin; L <= opts.xmax; L += 4){
+    const t = el("text", {x:X(L), y:H-14, "font-size":"10",
+      "text-anchor":"middle", fill:"var(--muted)"}, svg);
+    t.textContent = L;
+  }
+  const xt = el("text", {x:(x0+x1)/2, y:H-2, "font-size":"11",
+    "text-anchor":"middle", fill:"var(--text2)"}, svg);
+  xt.textContent = opts.xlabel || "layer";
+  series.forEach(s=>{
+    const pts = s.pts.filter(p=>Number.isFinite(p[1]));
+    el("polyline", {points: pts.map(p=>`${X(p[0])},${Y(p[1])}`).join(" "),
+      fill:"none", stroke:s.color, "stroke-width":2}, svg);
+    pts.forEach(p=> el("circle", {cx:X(p[0]), cy:Y(p[1]), r:2.5,
+      fill:s.color}, svg));
+  });
+  container.appendChild(svg);
+}
+
+const panes = {tabA:"paneA", tabB:"paneB", tabC:"paneC"};
+Object.keys(panes).forEach(id=>{
+  document.getElementById(id).onclick = ()=>{
+    Object.keys(panes).forEach(j=>{
+      document.getElementById(j).className = j===id ? "on" : "";
+      document.getElementById(panes[j]).style.display = j===id ? "" : "none";
+    });
+  };
+});
+
+document.getElementById("a_pc1").textContent =
+  Math.round(D.pc19[0]*100) + "%";
+document.getElementById("a_hpc1").textContent =
+  Math.round(D.human.pc_shares[0]*100) + "%";
+const ls19 = D.layer_stats.find(s=>s.layer===20) || D.layer_stats[10];
+document.getElementById("a_wb").textContent =
+  ls19.within_cos.toFixed(2) + " vs " + ls19.between_cos.toFixed(2);
+
+heat(document.getElementById("heatModel"), D.cos19,
+  {lo:0, hi:1, band:true, rowTopics:D.topics, colTopics:D.topics});
+heat(document.getElementById("heatHuman"), D.human.corr,
+  {lo:0, hi:1, band:true, rowTopics:D.human.topics, colTopics:D.human.topics});
+
+barChart(document.getElementById("screeModel"),
+  D.pc19, D.pc19.map((_,i)=>"PC"+(i+1)),
+  D.pc19.map((_,i)=> i===0 ? "var(--red)" : "var(--gray)"),
+  {title:"model: variance share of direction field, layer 19", x0:40, max:1});
+barChart(document.getElementById("screeHuman"),
+  D.human.pc_shares, D.human.pc_shares.map((_,i)=>"PC"+(i+1)),
+  D.human.pc_shares.map((_,i)=> i===0 ? "var(--red)" : "var(--gray)"),
+  {title:"humans: eigenvalue share of attitude correlations", x0:40, max:1});
+
+function renderDimByLayer(){
+  const pts1 = D.layer_stats.map(s=>[s.layer, s.pc_shares[0]]);
+  const ptsW = D.layer_stats.map(s=>[s.layer, s.within_cos]);
+  const ptsB = D.layer_stats.map(s=>[s.layer, s.between_cos]);
+  lineChart(document.getElementById("dimByLayer"),
+    [{pts:pts1, color:"var(--red)"},
+     {pts:ptsW, color:"var(--teal)"},
+     {pts:ptsB, color:"var(--gray)"}],
+    {xmin:0, xmax:36, ymax:1, aria:"PC1 share and topic cosines by layer"});
+}
+renderDimByLayer();
+document.getElementById("layerA").oninput = e=>{
+  document.getElementById("layerAv").textContent = e.target.value;
+  const s = D.layer_stats.find(x=>x.layer===+e.target.value);
+  if (s) document.getElementById("a_wb").textContent =
+    (s.within_cos||0).toFixed(2) + " vs " + (s.between_cos||0).toFixed(2);
+};
+
+const med = a => { const b=[...a].sort((x,y)=>x-y); return b[b.length>>1]; };
+document.getElementById("b_ansf").textContent =
+  (med(D.ans_frac)*100).toFixed(1) + "%";
+document.getElementById("b_iansf").textContent =
+  (med(D.ind_ans_frac)*100).toFixed(1) + "%";
+
+function renderTransfer(c){
+  const wrap = document.getElementById("transferWrap");
+  if (!D.steering || c === null){
+    wrap.innerHTML = "<p class='note'>Steering grid not yet computed — re-run "
+      + "vector_analysis.py after vector_steering.py finishes.</p>";
+    document.getElementById("b_transfer").textContent = "pending";
+    return;
+  }
+  const T = D.steering, tr = T.transfer[c];
+  const dirNames = Object.keys(tr);
+  const M = dirNames.map(d=>tr[d]);
+  const mx = Math.max(...M.flat().filter(v=>v!==null).map(Math.abs), 0.01);
+  const cv = document.getElementById("heatTransfer");
+  heat(cv, M, {diverging:true, max:mx});
+  cv.style.maxWidth = "560px";
+  document.getElementById("transferCap").textContent =
+    `Rows: steering direction (top = global, then ${dirNames.length-1} topics). `
+    + `Columns: ${T.topics.length} item topics: ${T.topics.join(", ")}. `
+    + `Color: oriented shift toward conservative (max |${mx.toFixed(2)}| scale units), ${c}.`;
+  const diag = [], off = [];
+  dirNames.forEach((d,i)=>{
+    if (!d.startsWith("topic:")) return;
+    const t = d.slice(6);
+    tr[d].forEach((v,j)=>{
+      if (v===null) return;
+      (T.topics[j]===t ? diag : off).push(v);
+    });
+  });
+  const dm = diag.reduce((a,b)=>a+b,0)/Math.max(diag.length,1);
+  const om = off.reduce((a,b)=>a+b,0)/Math.max(off.length,1);
+  document.getElementById("b_transfer").textContent =
+    `own ${dm.toFixed(2)} vs other ${om.toFixed(2)}`;
+}
+(function(){
+  const cs = D.steering ? Object.keys(D.steering.transfer) : [];
+  if (!cs.length){ renderTransfer(null); return; }
+  const pref = cs.includes("c=4 L29") ? "c=4 L29" : cs[cs.length-1];
+  const cont = document.getElementById("cBtns");
+  cs.forEach(c=>{
+    const b = document.createElement("button");
+    b.textContent = c;
+    b.className = c===pref ? "on" : "";
+    b.onclick = ()=>{ Array.from(cont.children).forEach(x=>x.className="");
+      b.className="on"; renderTransfer(c); };
+    cont.appendChild(b);
+  });
+  renderTransfer(pref);
+})();
+
+(function(){
+  const idx = D.items.map((_,i)=>i);
+  const vals = [];
+  const colors = [];
+  const labels = [];
+  idx.forEach(i=>{
+    vals.push(D.ans_frac[i]); colors.push("var(--red)");
+    labels.push(D.items[i]);
+    vals.push(D.ind_ans_frac[i]); colors.push("var(--violet)");
+    labels.push("");
+  });
+  barChart(document.getElementById("ansFracChart"), vals, labels, colors,
+    {w:900, rowH:11, x0:100, max:Math.max(...vals),
+     aria:"answer-relevant fractions per item"});
+})();
+
+const PCOLORS = ["var(--blue)","var(--red)","var(--violet)","var(--amber)"];
+(function(){
+  const lg = document.getElementById("personaLegend");
+  D.personas.forEach((p,i)=>{
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot" style="background:${PCOLORS[i]}"></span>${p}`;
+    lg.appendChild(s);
+  });
+})();
+function renderMap(L){
+  const m = D.persona_maps[String(L)];
+  const cont = document.getElementById("personaMap");
+  cont.innerHTML = "";
+  if (!m) return;
+  const W = 900, H = 380, cx = W/2, cy = H/2, s = Math.min(W,H)/2 - 20;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img",
+    "aria-label":"persona map at layer " + L});
+  el("line", {x1:cx-s, y1:cy, x2:cx+s, y2:cy, stroke:"var(--border)"}, svg);
+  el("line", {x1:cx, y1:cy-s, x2:cx, y2:cy+s, stroke:"var(--border)"}, svg);
+  m.x.forEach((x,i)=>{
+    el("circle", {cx:cx+x*s, cy:cy-m.y[i]*s, r:4,
+      fill:PCOLORS[m.p[i]], opacity:0.65}, svg);
+  });
+  cont.appendChild(svg);
+}
+renderMap(20);
+document.getElementById("layerC").oninput = e=>{
+  document.getElementById("layerCv").textContent = e.target.value;
+  renderMap(+e.target.value);
+};
+
+(function(){
+  const layers = D.probe_acc.map((_,i)=>i);
+  const s = [
+    {pts: layers.map(L=>[L, D.probe_acc[L]]), color:"var(--blue)"},
+    {pts: layers.map(L=>[L, D.separability[L] /
+        Math.max(...D.separability.filter(Number.isFinite))]),
+     color:"var(--teal)"},
+    {pts: layers.map(L=>[L, D.ind_offaxis[L]]), color:"var(--violet)"},
+  ];
+  if (D.steering && D.steering.layer_sweep.length){
+    const mx = Math.max(...D.steering.layer_sweep.map(p=>Math.abs(p.shift)), 0.01);
+    s.push({pts: D.steering.layer_sweep.map(p=>[p.layer+1, p.shift/mx]),
+            color:"var(--amber)"});
+  }
+  lineChart(document.getElementById("depthCurves"), s,
+    {xmin:0, xmax:36, ymax:1.02, ymin:0, h:260,
+     aria:"depth curves: probing, separability, off-axis, steering"});
+})();
+</script>
+</body>
+</html>
